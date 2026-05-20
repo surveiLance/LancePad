@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Paste your notes. Lance does the rest — cards, quizzes, and a tutor that explains what you got wrong.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/lancebot.png",
+    icon: "/lancebot-icon.svg",
     apple: "/lancebot.png",
   },
 };
