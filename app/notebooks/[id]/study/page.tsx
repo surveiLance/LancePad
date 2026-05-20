@@ -1,0 +1,303 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, RotateCcw } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import LanceBot from "@/components/LanceBot";
+import Button from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
+
+type QuizResult = { cardId: string; question: string; result: "correct" | "incorrect"; userAnswer: string; correctAnswer: string };
+type CardState = "question" | "answered" | "revealed";
+
+export default function StudyPage() {
+  const params = useParams();
+  const router = useRouter();
+  const notebookId = params.id as Id<"notebooks">;
+
+  const notebook = useQuery(api.notebooks.get, { id: notebookId });
+  const allCards = useQuery(api.cards.getByNotebook, { notebookId });
+  const recordReview = useMutation(api.cards.recordReview);
+
+  const [cards, setCards] = useState<typeof allCards>([]);
+  const [current, setCurrent] = useState(0);
+  const [cardState, setCardState] = useState<CardState>("question");
+  const [selected, setSelected] = useState("");
+  const [shortAnswer, setShortAnswer] = useState("");
+  const [grading, setGrading] = useState(false);
+  const [gradeFeedback, setGradeFeedback] = useState<{ correct: boolean; partial: boolean; feedback: string } | null>(null);
+  const [results, setResults] = useState<QuizResult[]>([]);
+  const [botMood, setBotMood] = useState<"idle" | "happy" | "celebrate" | "sad" | "thinking">("idle");
+  const [botMessage, setBotMessage] = useState("");
+  const [summary, setSummary] = useState("");
+  const [done, setDone] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  useEffect(() => {
+    if (allCards && allCards.length > 0) {
+      setCards([...allCards]);
+      setBotMood("happy");
+      setBotMessage("Alright, let's see what you've got! 🎯 I'll be right here watching 👀");
+    }
+  }, [allCards]);
+
+  useEffect(() => {
+    if (notebook === null) router.push("/notebooks");
+  }, [notebook, router]);
+
+  const card = cards?.[current];
+
+  function handleMultipleChoice(option: string) {
+    if (cardState !== "question" || !card) return;
+    setSelected(option);
+    setCardState("answered");
+    const isCorrect = option === card.answer;
+    recordResult(isCorrect, option);
+    if (isCorrect) { setBotMood("celebrate"); setBotMessage("YESSS! That's it! 🎉 Clean!"); }
+    else { setBotMood("sad"); setBotMessage("Ooh, not quite — correct answer is highlighted below 👇"); }
+  }
+
+  async function handleShortAnswer() {
+    if (!shortAnswer.trim() || grading || !card) return;
+    setGrading(true);
+    setCardState("answered");
+    setBotMood("thinking");
+    setBotMessage("Hmm, let me check your answer... 🤔");
+
+    const res = await fetch("/api/grade-answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: card.question, modelAnswer: card.answer, userAnswer: shortAnswer, notebookTitle: notebook?.title }),
+    });
+    const grade = await res.json();
+    setGradeFeedback(grade);
+    setGrading(false);
+    const isCorrect = grade.correct || (grade.partial && grade.score >= 70);
+    recordResult(isCorrect, shortAnswer);
+    setBotMood(grade.correct ? "celebrate" : grade.partial ? "thinking" : "sad");
+    setBotMessage(grade.feedback);
+  }
+
+  function handleRevealFlashcard(isCorrect: boolean) {
+    if (!card) return;
+    setCardState("revealed");
+    recordResult(isCorrect, isCorrect ? card.answer : "incorrect");
+    if (isCorrect) { setBotMood("celebrate"); setBotMessage("Let's GO! You knew it! 🔥"); }
+    else { setBotMood("sad"); setBotMessage("No worries — now you've seen it, it'll stick! 🧠"); }
+  }
+
+  function recordResult(isCorrect: boolean, userAnswer: string) {
+    if (!card) return;
+    const result = isCorrect ? "correct" : "incorrect";
+    setResults((prev) => [...prev, { cardId: card._id, question: card.question, result, userAnswer, correctAnswer: card.answer }]);
+    recordReview({ cardId: card._id, result });
+  }
+
+  async function nextCard() {
+    if (!cards) return;
+    if (current + 1 >= cards.length) {
+      setDone(true);
+      setLoadingSummary(true);
+      const res = await fetch("/api/session-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ results, notebookTitle: notebook?.title }),
+      });
+      const { summary: s } = await res.json();
+      setSummary(s);
+      setLoadingSummary(false);
+      return;
+    }
+    setCurrent((c) => c + 1);
+    setCardState("question");
+    setSelected("");
+    setShortAnswer("");
+    setGradeFeedback(null);
+    setBotMood("idle");
+    setBotMessage("");
+  }
+
+  function restartSession() {
+    setCurrent(0);
+    setCardState("question");
+    setSelected("");
+    setShortAnswer("");
+    setGradeFeedback(null);
+    setResults([]);
+    setBotMood("happy");
+    setBotMessage("Round 2! Let's go harder 💪");
+    setDone(false);
+    setSummary("");
+  }
+
+  if (done) {
+    const correctCount = results.filter((r) => r.result === "correct").length;
+    const pct = Math.round((correctCount / results.length) * 100);
+    const mood = pct >= 80 ? "celebrate" : pct >= 50 ? "happy" : "sad";
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4 py-10">
+        <div className="max-w-lg w-full text-center">
+          <LanceBot mood={mood} size={80} className="mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-white mb-1">
+            {pct >= 80 ? "Absolutely cooked 🔥" : pct >= 50 ? "Decent run 👍" : "We'll get there 💪"}
+          </h1>
+          <p className="text-gray-400 mb-6">{correctCount} / {results.length} correct ({pct}%)</p>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-left mb-6">
+            <p className="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2">🤖 LanceBot&apos;s Session Recap</p>
+            {loadingSummary ? (
+              <div className="flex items-center gap-2 text-gray-400 text-sm"><LanceBot mood="thinking" size={24} animate /> <span>Writing up your recap...</span></div>
+            ) : (
+              <p className="text-gray-300 text-sm leading-relaxed">{summary}</p>
+            )}
+          </div>
+          {results.filter((r) => r.result === "incorrect").length > 0 && (
+            <div className="bg-red-950/30 border border-red-900/50 rounded-2xl p-4 text-left mb-6">
+              <p className="text-xs text-red-400 font-semibold uppercase tracking-wider mb-2">Review these 👀</p>
+              <ul className="space-y-1">
+                {results.filter((r) => r.result === "incorrect").map((r, i) => (
+                  <li key={i} className="text-gray-400 text-sm flex items-start gap-2">
+                    <XCircle size={14} className="text-red-400 mt-0.5 flex-shrink-0" />
+                    {r.question}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-3 justify-center">
+            <Button onClick={restartSession} variant="secondary"><RotateCcw size={15} />Study again</Button>
+            <Link href={`/notebooks/${notebookId}/tutor`}><Button>Chat with LanceBot</Button></Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!card) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <LanceBot mood="thinking" size={60} />
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      <header className="border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+          <Link href={`/notebooks/${notebookId}`} className="text-gray-500 hover:text-gray-300"><ArrowLeft size={18} /></Link>
+          <div className="flex-1 text-center"><span className="text-gray-400 text-sm">{notebook?.emoji} {notebook?.title}</span></div>
+          <span className="text-gray-500 text-sm">{current + 1} / {cards?.length}</span>
+        </div>
+        <div className="h-1 bg-gray-900">
+          <div className="h-full bg-purple-600 transition-all duration-500" style={{ width: `${((current + 1) / (cards?.length ?? 1)) * 100}%` }} />
+        </div>
+      </header>
+
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
+        {botMessage && (
+          <div className="flex items-start gap-3 bg-purple-950/30 border border-purple-900/40 rounded-2xl px-4 py-3 bounce-in">
+            <LanceBot mood={botMood} size={36} animate={botMood === "celebrate"} />
+            <p className="text-purple-200 text-sm leading-relaxed mt-1">{botMessage}</p>
+          </div>
+        )}
+
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">
+            {card.type === "multiple_choice" && "Multiple Choice"}
+            {card.type === "fill_blank" && "Fill in the Blank"}
+            {card.type === "short_answer" && "Short Answer (graded by LanceBot)"}
+            {card.type === "flashcard" && "Flashcard"}
+          </span>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <p className="text-white text-lg leading-relaxed font-medium">{card.question}</p>
+        </div>
+
+        {card.type === "multiple_choice" && (
+          <div className="space-y-3">
+            {(card.options ?? []).map((option) => {
+              const isSelected = selected === option;
+              const isCorrect = option === card.answer;
+              const showResult = cardState === "answered";
+              return (
+                <button key={option} onClick={() => handleMultipleChoice(option)} disabled={cardState !== "question"}
+                  className={cn("w-full text-left px-5 py-4 rounded-2xl border transition-all font-medium",
+                    !showResult && "bg-gray-900 border-gray-800 hover:border-purple-600 hover:bg-gray-800/50",
+                    showResult && isCorrect && "bg-green-900/40 border-green-600 text-green-200",
+                    showResult && isSelected && !isCorrect && "bg-red-900/40 border-red-600 text-red-200",
+                    showResult && !isSelected && !isCorrect && "bg-gray-900 border-gray-800 opacity-50",
+                  )}>
+                  <div className="flex items-center gap-3">
+                    {showResult && isCorrect && <CheckCircle2 size={18} className="text-green-400 flex-shrink-0" />}
+                    {showResult && isSelected && !isCorrect && <XCircle size={18} className="text-red-400 flex-shrink-0" />}
+                    <span>{option}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {card.type === "fill_blank" && (
+          <div className="space-y-3">
+            <input type="text" placeholder="Fill in the blank..." value={shortAnswer}
+              onChange={(e) => setShortAnswer(e.target.value)} disabled={cardState !== "question"}
+              onKeyDown={(e) => e.key === "Enter" && handleShortAnswer()}
+              className="w-full bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-colors" />
+            {cardState === "question" && <Button onClick={handleShortAnswer} disabled={!shortAnswer.trim()}>Check answer</Button>}
+            {cardState === "answered" && (
+              <div className={cn("rounded-xl px-4 py-3 text-sm",
+                shortAnswer.toLowerCase().trim() === card.answer.toLowerCase().trim()
+                  ? "bg-green-900/30 border border-green-700 text-green-300"
+                  : "bg-red-900/30 border border-red-700 text-red-300")}>
+                <span className="font-semibold">Correct answer: </span>{card.answer}
+              </div>
+            )}
+          </div>
+        )}
+
+        {card.type === "short_answer" && (
+          <div className="space-y-3">
+            <textarea placeholder="Type your answer here..." value={shortAnswer}
+              onChange={(e) => setShortAnswer(e.target.value)} disabled={cardState !== "question" || grading}
+              rows={4} className="w-full bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-colors resize-none" />
+            {cardState === "question" && <Button onClick={handleShortAnswer} disabled={!shortAnswer.trim() || grading}>{grading ? "LanceBot is grading... 🤖" : "Submit answer"}</Button>}
+            {gradeFeedback && (
+              <div className={cn("rounded-xl px-4 py-3 text-sm space-y-1",
+                gradeFeedback.correct ? "bg-green-900/30 border border-green-700" : gradeFeedback.partial ? "bg-yellow-900/30 border border-yellow-700" : "bg-red-900/30 border border-red-700")}>
+                <div className="font-semibold text-white">{gradeFeedback.correct ? "✅ Correct!" : gradeFeedback.partial ? "⚠️ Partial" : "❌ Missed"}</div>
+                <p className="text-gray-300">{gradeFeedback.feedback}</p>
+                <p className="text-gray-500 text-xs"><span className="font-semibold">Model answer:</span> {card.answer}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {card.type === "flashcard" && (
+          <div className="space-y-3">
+            {cardState === "question" && <Button variant="secondary" className="w-full" onClick={() => setCardState("revealed")}>Reveal answer</Button>}
+            {cardState === "revealed" && (
+              <>
+                <div className="bg-gray-900 border border-gray-700 rounded-xl px-5 py-4"><p className="text-gray-300">{card.answer}</p></div>
+                <div className="flex gap-3">
+                  <Button variant="danger" className="flex-1" onClick={() => handleRevealFlashcard(false)}><XCircle size={15} />Missed it</Button>
+                  <Button className="flex-1" onClick={() => handleRevealFlashcard(true)}><CheckCircle2 size={15} />Got it!</Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {cardState !== "question" && !grading && (
+          <Button onClick={nextCard} className="self-end">
+            {current + 1 >= (cards?.length ?? 0) ? "See results" : "Next"}
+            <ChevronRight size={15} />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

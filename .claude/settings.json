@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node_modules/.bin/next build *)",
+      "Bash(sed -i '' 's/import type { NextConfig } from \"next\";//' /Users/lance/Work/study-app/next.config.mjs)",
+      "Bash(sed -i '' 's/const config: NextConfig = {/const config = {/' /Users/lance/Work/study-app/next.config.mjs)",
+      "Bash(node_modules/.bin/next dev *)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(npm uninstall *)",
+      "Bash(node -e ' *)",
+      "Bash(cat /tmp/convex-env.txt 2>/dev/null || echo \"File not found\")",
+      "Read(//private/tmp/**)",
+      "Bash(lsof -ti:3001)"
+    ]
+  }
+}
