@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: "LancePad — Study smarter with AI",
   description: "Paste your notes. Lance does the rest — cards, quizzes, and a tutor that explains what you got wrong.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/lancebot.png",
+    apple: "/lancebot.png",
+  },
 };
 
 export const viewport: Viewport = {

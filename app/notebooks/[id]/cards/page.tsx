@@ -3,11 +3,14 @@
 import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Zap, Loader2, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Zap, Loader2, Trash2, Plus, BookOpen, ClipboardList, X } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import LanceBot from "@/components/LanceBot";
+import LoadingScreen from "@/components/LoadingScreen";
+import GroqUsageBadge from "@/components/GroqUsageBadge";
+import { setGroqUsage } from "@/lib/groq-usage-store";
 
 const TYPE_LABEL: Record<string, string> = {
   multiple_choice: "Multiple Choice",
@@ -23,6 +26,12 @@ const TYPE_COLOR: Record<string, string> = {
   flashcard: "bg-green-900/60 text-green-300 border-green-700/40",
 };
 
+const QUIZ_TYPES = [
+  { type: "multiple_choice", label: "Multiple Choice", desc: "Pick the right answer from 4 options", icon: "🔘" },
+  { type: "identification",  label: "Identification",  desc: "Type the exact answer",              icon: "✏️" },
+  { type: "fill_blank",      label: "Fill in the Blank", desc: "Complete the missing word",        icon: "📝" },
+];
+
 export default function CardsPage() {
   const params = useParams();
   const router = useRouter();
@@ -34,7 +43,10 @@ export default function CardsPage() {
   const removeCard = useMutation(api.cards.remove);
   const addCard = useMutation(api.cards.add);
 
-  const [generating, setGenerating] = useState(false);
+  const [generatingCards, setGeneratingCards] = useState(false);
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [showQuizPicker, setShowQuizPicker] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
   const [newQ, setNewQ] = useState("");
   const [newA, setNewA] = useState("");
@@ -45,42 +57,68 @@ export default function CardsPage() {
     return 0;
   });
 
-  const handleGenerate = useCallback(async () => {
+  function handleRateLimitError() {
+    setGroqUsage({ remainingTokens: "0", limitTokens: "30000", remainingRequests: null, limitRequests: null, resetTokens: null });
+    setGenError("Rate limit hit — Groq resets every 60s. Wait a moment and try again ⏳");
+  }
+
+  const handleGenerateCards = useCallback(async () => {
     const noteContent = note?.content;
     if (!noteContent || noteContent.length < 10) {
-      alert("Add some notes first — LanceBot needs something to work with! 📝");
+      setGenError("Add some notes first — LanceBot needs something to work with! 📝");
       return;
     }
-    setGenerating(true);
+    setGeneratingCards(true);
+    setGenError(null);
     try {
       const res = await fetch("/api/generate-quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          notebookId,
-          noteContent,
-          notebookTitle: notebook?.title,
-          mode: "cards",
-        }),
+        body: JSON.stringify({ notebookId, noteContent, notebookTitle: notebook?.title, mode: "cards" }),
       });
       const data = await res.json();
+      if (data.error === "rate_limit") throw new Error("rate_limit");
       if (data.error) throw new Error(data.error);
-    } catch {
-      alert("Something went wrong. Try again!");
+      if (data.rateLimitInfo) setGroqUsage(data.rateLimitInfo);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      msg === "rate_limit" ? handleRateLimitError() : setGenError("Something went wrong. Try again!");
     } finally {
-      setGenerating(false);
+      setGeneratingCards(false);
     }
   }, [notebookId, note?.content, notebook?.title]);
 
+  async function handleGenerateQuiz(quizType: string) {
+    const noteContent = note?.content;
+    if (!noteContent || noteContent.length < 10) {
+      setGenError("Add some notes first — LanceBot needs something to work with! 📝");
+      return;
+    }
+    setShowQuizPicker(false);
+    setGeneratingQuiz(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/generate-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notebookId, noteContent, notebookTitle: notebook?.title, mode: "quiz", quizType }),
+      });
+      const data = await res.json();
+      if (data.error === "rate_limit") throw new Error("rate_limit");
+      if (data.error) throw new Error(data.error);
+      if (data.rateLimitInfo) setGroqUsage(data.rateLimitInfo);
+      router.push(`/notebooks/${notebookId}/study?session=${data.sessionId}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      msg === "rate_limit" ? handleRateLimitError() : setGenError("Something went wrong. Try again!");
+    } finally {
+      setGeneratingQuiz(false);
+    }
+  }
+
   if (notebook === null) { router.push("/notebooks"); return null; }
 
-  if (!notebook) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LanceBot mood="thinking" size={60} />
-      </div>
-    );
-  }
+  if (!notebook) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -88,34 +126,66 @@ export default function CardsPage() {
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link href={`/notebooks/${notebookId}`} className="text-gray-500 hover:text-gray-300 flex items-center gap-1.5 text-sm">
             <ArrowLeft size={15} />
-            Back
+            Back to Notes
           </Link>
           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: notebook.color }} />
           <span className="text-white font-semibold truncate flex-1 text-sm">
-            {notebook.emoji} {notebook.title} — Cards
+            {notebook.emoji} {notebook.title}
           </span>
+          <GroqUsageBadge />
           {sortedCards.length > 0 && (
             <span className="text-xs text-gray-500">{sortedCards.length} card{sortedCards.length !== 1 ? "s" : ""}</span>
           )}
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
-        {/* Generate button */}
+      <main className="max-w-3xl mx-auto w-full px-4 py-6 flex flex-col gap-3">
+
+        {/* Primary action — Generate Flashcards */}
         <button
-          onClick={handleGenerate}
-          disabled={generating}
+          onClick={handleGenerateCards}
+          disabled={generatingCards || generatingQuiz}
           className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold border border-gray-700 transition-all hover:-translate-y-0.5"
         >
-          {generating
-            ? <><Loader2 size={16} className="animate-spin" /> Generating cards...</>
-            : <><Zap size={16} className="text-yellow-400" /> Generate Cards</>
+          {generatingCards
+            ? <><Loader2 size={16} className="animate-spin" /> Creating flashcards...</>
+            : <><Zap size={16} className="text-yellow-400" /> Generate Flashcards from Notes</>
           }
         </button>
 
-        {/* Cards list */}
+        {/* Secondary actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setShowQuizPicker(true)}
+            disabled={generatingCards || generatingQuiz}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-900/40"
+          >
+            {generatingQuiz
+              ? <><Loader2 size={14} className="animate-spin" /> Generating...</>
+              : <><BookOpen size={14} /> Start a Quiz</>
+            }
+          </button>
+          <Link
+            href={`/notebooks/${notebookId}/quizzes`}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-semibold text-sm transition-all hover:-translate-y-0.5"
+          >
+            <ClipboardList size={14} />
+            View Quiz History
+          </Link>
+        </div>
+
+        {/* Error banner */}
+        {genError && (
+          <div className="flex items-start gap-2 px-4 py-3 rounded-2xl bg-red-950/40 border border-red-800/50 text-red-300 text-sm bounce-in">
+            <span className="text-base leading-none mt-0.5">⚠️</span>
+            <span>{genError}</span>
+            <button onClick={() => setGenError(null)} className="ml-auto text-red-500 hover:text-red-300 text-xs flex-shrink-0">✕</button>
+          </div>
+        )}
+
+        {/* Flashcards list */}
         {sortedCards.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 mt-1">
             {sortedCards.map((card, i) => (
               <div
                 key={card._id}
@@ -175,7 +245,7 @@ export default function CardsPage() {
           </div>
         )}
 
-        {/* Add manually */}
+        {/* Create card manually */}
         {showAddCard ? (
           <div className="bg-gray-900 border border-purple-700/40 rounded-2xl p-4 space-y-3 bounce-in">
             <p className="text-xs text-purple-400 font-semibold uppercase tracking-wider">New Flashcard</p>
@@ -204,7 +274,7 @@ export default function CardsPage() {
                 disabled={!newQ.trim() || !newA.trim()}
                 className="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
               >
-                Add Card
+                Save Card
               </button>
               <button
                 onClick={() => { setShowAddCard(false); setNewQ(""); setNewA(""); }}
@@ -220,10 +290,46 @@ export default function CardsPage() {
             className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-700 hover:border-purple-600/60 text-gray-500 hover:text-purple-400 text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:bg-purple-950/10"
           >
             <Plus size={15} />
-            Add card manually
+            Create a Card Manually
           </button>
         )}
       </main>
+
+      {/* Quiz type picker modal */}
+      {showQuizPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowQuizPicker(false)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-80 mx-4 bounce-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-white font-bold text-lg">Choose Quiz Type</h3>
+              <button onClick={() => setShowQuizPicker(false)} className="text-gray-500 hover:text-gray-300 p-1 rounded-lg hover:bg-gray-800 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-gray-500 text-sm mb-5">How do you want to be tested?</p>
+            <div className="space-y-3">
+              {QUIZ_TYPES.map((opt) => (
+                <button
+                  key={opt.type}
+                  onClick={() => handleGenerateQuiz(opt.type)}
+                  className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-purple-600/50 text-left transition-all hover:-translate-y-0.5"
+                >
+                  <span className="text-2xl">{opt.icon}</span>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{opt.label}</p>
+                    <p className="text-gray-500 text-xs">{opt.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,27 +22,27 @@ function extractText(tiptapJson: string): string {
 
 function buildPrompt(plainText: string, notebookTitle: string, mode: string, quizType?: string): string {
   if (mode === "cards") {
-    return `You are a flashcard generator. Given these notes, generate comprehensive study flashcards that cover ALL key points.
+    return `You are a flashcard generator. Given these notes, generate one flashcard per key topic — cover everything, leave nothing out.
 
 NOTES (from "${notebookTitle}"):
 ${plainText}
 
-Generate as many flashcards as needed to cover every important concept, term, fact, and relationship in the notes — aim for 15–25 cards. Each card has a concept or question on the front and a clear explanation on the back.
+Generate as many cards as the notes require. For short notes that's fine to be 5–10; for detailed notes generate 20–40 or more. Prioritize coverage over hitting a number. Every named concept, definition, date, person, formula, process, and relationship deserves its own card.
 
 Return ONLY valid JSON array, no markdown, no code blocks:
 [
   {
     "question": "What is [concept]?",
-    "answer": "Clear explanation of the concept",
+    "answer": "Clear, complete explanation (1–3 sentences)",
     "type": "flashcard"
   }
 ]
 
 Rules:
-- Cover EVERY key concept, definition, date, person, process, and relationship in the notes
-- Do not skip minor but important details
-- Answers should be concise but complete (1–3 sentences)
-- Do not repeat questions`;
+- One card per key topic — do not bundle multiple unrelated ideas into one card
+- Cover EVERY distinct concept in the notes, even brief mentions
+- Answers must be self-contained and accurate to the notes
+- Do not repeat the same question twice`;
   }
 
   // Quiz mode — branch by quizType
@@ -149,13 +149,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not enough content" }, { status: 400 });
   }
 
-  const prompt = buildPrompt(plainText, notebookTitle, mode, quizType);
+  const model = "llama-3.1-8b-instant"; // 30k TPM free limit — all endpoints use this
 
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.7,
-  });
+  // Truncate very long notes to keep prompt size reasonable
+  const MAX_CHARS = mode === "cards" ? 6000 : 8000;
+  const truncated = plainText.length > MAX_CHARS ? plainText.slice(0, MAX_CHARS) + "\n\n[Note truncated for length]" : plainText;
+
+  const prompt = buildPrompt(truncated, notebookTitle, mode, quizType);
+
+  let completion;
+  let rateLimitInfo: Record<string, string | null> = {};
+  try {
+    const { data, response } = await groq.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+    }).withResponse();
+    completion = data;
+    rateLimitInfo = {
+      remainingTokens: response.headers.get("x-ratelimit-remaining-tokens"),
+      limitTokens: response.headers.get("x-ratelimit-limit-tokens"),
+      remainingRequests: response.headers.get("x-ratelimit-remaining-requests"),
+      limitRequests: response.headers.get("x-ratelimit-limit-requests"),
+      resetTokens: response.headers.get("x-ratelimit-reset-tokens"),
+    };
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status;
+    const message = (err as { message?: string }).message ?? "unknown";
+    console.error("[generate-quiz] Groq error:", status, message);
+    if (status === 429) {
+      return NextResponse.json({ error: "rate_limit" }, { status: 429 });
+    }
+    return NextResponse.json({ error: "ai_error", detail: message }, { status: 500 });
+  }
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
 
@@ -164,7 +190,7 @@ export async function POST(req: NextRequest) {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     questions = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
   } catch {
-    return NextResponse.json({ error: "Failed to parse questions" }, { status: 500 });
+    return NextResponse.json({ error: "parse_error" }, { status: 500 });
   }
 
   if (mode === "quiz") {
@@ -178,7 +204,7 @@ export async function POST(req: NextRequest) {
         options: q.options,
       })),
     });
-    return NextResponse.json({ sessionId });
+    return NextResponse.json({ sessionId, rateLimitInfo });
   }
 
   await fetchMutation(api.cards.replaceAll, {
@@ -191,5 +217,5 @@ export async function POST(req: NextRequest) {
     })),
   });
 
-  return NextResponse.json({ count: questions.length });
+  return NextResponse.json({ count: questions.length, rateLimitInfo });
 }

@@ -17,7 +17,7 @@ Missed: ${incorrect.map((r: { question: string }) => r.question).join(", ") || "
 Give a 3-sentence session summary as LanceBot — whimsical, direct, specific about what to review. Plain text only.`;
 
   const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant",
     messages: [
       { role: "system", content: LANCEBOT_SYSTEM_PROMPT },
       { role: "user", content: prompt },

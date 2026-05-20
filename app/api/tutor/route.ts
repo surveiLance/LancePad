@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }));
 
-  const stream = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+  const { data: stream, response: groqResponse } = await groq.chat.completions.create({
+    model: "llama-3.1-8b-instant",
     messages: [{ role: "system", content: systemPrompt }, ...history],
     temperature: 0.7,
     stream: true,
-  });
+  }).withResponse();
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
   });
 
   return new NextResponse(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "x-ratelimit-remaining-tokens": groqResponse.headers.get("x-ratelimit-remaining-tokens") ?? "",
+      "x-ratelimit-limit-tokens":     groqResponse.headers.get("x-ratelimit-limit-tokens") ?? "",
+      "x-ratelimit-remaining-requests": groqResponse.headers.get("x-ratelimit-remaining-requests") ?? "",
+      "x-ratelimit-limit-requests":   groqResponse.headers.get("x-ratelimit-limit-requests") ?? "",
+      "x-ratelimit-reset-tokens":     groqResponse.headers.get("x-ratelimit-reset-tokens") ?? "",
+    },
   });
 }

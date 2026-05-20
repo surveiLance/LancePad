@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 You are LanceBot helping a student directly. Be specific, practical, and brief (3–6 sentences max unless asked for more).${pageBlock}${contextBlock}`;
 
   const stream = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: instruction },

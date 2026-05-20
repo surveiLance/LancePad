@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, RotateCcw } from "lucide-react";
@@ -8,6 +8,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import LanceBot from "@/components/LanceBot";
+import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -48,9 +49,33 @@ export default function StudyPage() {
   const [gradeFeedback, setGradeFeedback] = useState<{ correct: boolean; partial: boolean; feedback: string } | null>(null);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [botMood, setBotMood] = useState<"idle" | "happy" | "celebrate" | "sad" | "thinking">("idle");
+  const [botMessage, setBotMessage] = useState("");
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [done, setDone] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summary, setSummary] = useState("");
+
+  const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Boom! ✨", "Nailed it! 🎯", "Clean! 💯", "Sige! 💪"];
+  const WRONG   = ["Aww, not quite 😔", "That one's tricky!", "Review that one 👀", "Oops! 😅", "We'll get it next time 💪"];
+  const PARTIAL = ["Almost there! 🤏", "Good effort! 💪", "Close! Keep it up ✨", "You got the gist!"];
+  const IDLE    = ["You got this! 💪", "Take your time 🤔", "Trust your notes! 📝", "What do you think?", "Breathe. You studied for this 😌"];
+
+  function pick(arr: string[]) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function setBotComment(mood: typeof botMood, message: string) {
+    setBotMood(mood);
+    setBotMessage(message);
+  }
+
+  // After moving to a new card, show an idle nudge after a short pause
+  useEffect(() => {
+    if (done || cardState !== "question") return;
+    setBotMessage("");
+    setBotMood("idle");
+    idleTimerRef.current = setTimeout(() => setBotMessage(pick(IDLE)), 1800);
+    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, done]);
 
   // Load cards from either quiz session or flashcard library
   useEffect(() => {
@@ -76,19 +101,20 @@ export default function StudyPage() {
 
   function handleMultipleChoice(option: string) {
     if (cardState !== "question" || !card) return;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setSelected(option);
     setCardState("answered");
     const isCorrect = option === card.answer;
     recordResult(isCorrect, option);
-    if (isCorrect) { setBotMood("celebrate"); }
-    else { setBotMood("sad"); }
+    setBotComment(isCorrect ? "celebrate" : "sad", pick(isCorrect ? CORRECT : WRONG));
   }
 
   async function handleShortAnswer() {
     if (!shortAnswer.trim() || grading || !card) return;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setGrading(true);
     setCardState("answered");
-    setBotMood("thinking");
+    setBotComment("thinking", "Checking your answer... 🤔");
 
     const res = await fetch("/api/grade-answer", {
       method: "POST",
@@ -100,15 +126,18 @@ export default function StudyPage() {
     setGrading(false);
     const isCorrect = grade.correct || (grade.partial && grade.score >= 70);
     recordResult(isCorrect, shortAnswer);
-    setBotMood(grade.correct ? "celebrate" : grade.partial ? "thinking" : "sad");
+    setBotComment(
+      grade.correct ? "celebrate" : grade.partial ? "happy" : "sad",
+      pick(grade.correct ? CORRECT : grade.partial ? PARTIAL : WRONG),
+    );
   }
 
   function handleRevealFlashcard(isCorrect: boolean) {
     if (!card) return;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setCardState("revealed");
     recordResult(isCorrect, isCorrect ? card.answer : "incorrect");
-    if (isCorrect) { setBotMood("celebrate"); }
-    else { setBotMood("sad"); }
+    setBotComment(isCorrect ? "celebrate" : "sad", pick(isCorrect ? CORRECT : WRONG));
   }
 
   function recordResult(isCorrect: boolean, userAnswer: string) {
@@ -157,6 +186,7 @@ export default function StudyPage() {
     setShortAnswer("");
     setGradeFeedback(null);
     setBotMood("idle");
+    setBotMessage("");
   }
 
   function restartSession() {
@@ -167,6 +197,7 @@ export default function StudyPage() {
     setGradeFeedback(null);
     setResults([]);
     setBotMood("idle");
+    setBotMessage("");
     setDone(false);
     setSummary("");
   }
@@ -214,11 +245,7 @@ export default function StudyPage() {
     );
   }
 
-  if (!card) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <LanceBot mood="thinking" size={60} />
-    </div>
-  );
+  if (!card) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -331,6 +358,19 @@ export default function StudyPage() {
             <ChevronRight size={15} />
           </Button>
         )}
+      </div>
+
+      {/* LanceBot — bottom left with timed speech bubble */}
+      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2 pointer-events-none">
+        {botMessage && (
+          <div
+            key={botMessage}
+            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-200 max-w-[180px] leading-relaxed shadow-lg bounce-in"
+          >
+            {botMessage}
+          </div>
+        )}
+        <LanceBot mood={botMood} size={52} animate={botMood === "thinking" || botMood === "idle"} />
       </div>
     </div>
   );

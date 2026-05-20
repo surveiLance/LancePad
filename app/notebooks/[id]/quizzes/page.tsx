@@ -8,6 +8,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import LanceBot from "@/components/LanceBot";
+import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
 
 const QUIZ_TYPE_LABEL: Record<string, string> = {
@@ -36,11 +37,7 @@ export default function QuizzesPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (notebook === null) { router.push("/notebooks"); return null; }
-  if (!sessions) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <LanceBot mood="thinking" size={60} />
-    </div>
-  );
+  if (!sessions) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-950">

@@ -56,6 +56,13 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   }).index("by_notebook", ["notebookId"]),
 
+  tutorMessages: defineTable({
+    notebookId: v.id("notebooks"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    createdAt: v.number(),
+  }).index("by_notebook", ["notebookId"]),
+
   cardReviews: defineTable({
     cardId: v.id("cards"),
     userId: v.optional(v.id("users")),

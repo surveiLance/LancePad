@@ -18,6 +18,23 @@ const PAGE_QUIPS: Record<string, string[]> = {
     "Bet? Bet. Tara na, mag-aral tayo 🚀",
     "Sige lang, manonood lang ako... pero mag-aral ka na ha.",
   ],
+  cards: [
+    "Generate mo na yung cards, andito na ako 👀",
+    "Flashcards? Solid choice. Retention goes brrr 🧠",
+    "Yung bawat card = isang concept na di mo malilimutan. Trust.",
+    "Uy, i-review mo na yung cards mo ha. Kaya mo yan 💪",
+    "Add mo na cards, para may ipag-aral tayo 📇",
+    "Ang ganda ng study method mo actually. Cards? Chef's kiss 🤌",
+    "Nabibilang ko yung cards mo. Dasig ka pa rin! 💜",
+  ],
+  quizzes: [
+    "Review mo yung past quizzes mo — doon mo makikita ang kalaban 👀",
+    "Yung wrong answers mo dati? That's the roadmap ngayon 🗺️",
+    "Uy, may quiz history ka na! Ibig sabihin nag-aral ka. Proud ako. 😤",
+    "Mistakes = free reviewers. Take notes literally.",
+    "Check mo yung scores mo. Improvement is brewing 📈",
+    "Quiz history check! Alam ko naman magaling ka na 💜",
+  ],
   study: [
     "Kaya mo yan lods!! 💜 Maniniwala ako sa'yo",
     "Ay, mali. Pero okay lang, ganyan talaga 😅 next!",
@@ -285,6 +302,8 @@ export default function FloatingLanceBot() {
     let quips: string[];
     if (pathname.includes("/study")) quips = PAGE_QUIPS.study;
     else if (pathname.includes("/tutor")) quips = PAGE_QUIPS.tutor;
+    else if (pathname.includes("/cards")) quips = PAGE_QUIPS.cards;
+    else if (pathname.includes("/quizzes")) quips = PAGE_QUIPS.quizzes;
     else quips = PAGE_QUIPS.notebooks;
 
     const first = setTimeout(() => showBubble(pick(quips)), 3000);
