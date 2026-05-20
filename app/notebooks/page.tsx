@@ -44,7 +44,7 @@ function LoadingScreen() {
     <div className="fixed inset-0 bg-gray-950 z-50 flex flex-col items-center justify-center gap-6">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-purple-700/10 blur-3xl rounded-full pointer-events-none" />
       <div className="relative flex flex-col items-center gap-5">
-        <LanceBot mood="thinking" size={110} animate />
+        <LanceBot mood="thinking" size={110} animate headsetFloat />
         <div
           key={quip}
           className="max-w-xs bg-gray-900 border border-purple-800/50 rounded-2xl px-5 py-3 text-sm text-purple-100 leading-snug text-center shadow-xl"

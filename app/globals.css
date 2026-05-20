@@ -48,8 +48,40 @@ body {
 
 /* Animations */
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+  0%   { transform: translateY(0px) rotate(0deg); }
+  20%  { transform: translateY(-7px) rotate(0.8deg); }
+  40%  { transform: translateY(-4px) rotate(-0.5deg); }
+  60%  { transform: translateY(-9px) rotate(1deg); }
+  80%  { transform: translateY(-3px) rotate(-0.8deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes lancebot-eye-wander {
+  0%,  20% { transform: translateX(0px); }
+  25%, 35%  { transform: translateX(1.5px); }
+  40%, 55%  { transform: translateX(0px); }
+  60%, 70%  { transform: translateX(-1.5px); }
+  75%, 100% { transform: translateX(0px); }
+}
+
+@keyframes headset-orbit-spin {
+  from { transform: translate(26px, 33px) rotate(0deg) translate(-26px, -33px); }
+  to   { transform: translate(26px, 33px) rotate(360deg) translate(-26px, -33px); }
+}
+@keyframes headset-counter-spin {
+  from { transform: translate(26px, 33px) rotate(0deg) translate(-26px, -33px); }
+  to   { transform: translate(26px, 33px) rotate(-360deg) translate(-26px, -33px); }
+}
+
+.headset-orbit-spin  { animation: headset-orbit-spin  3s linear infinite; }
+.headset-counter-spin { animation: headset-counter-spin 3s linear infinite; }
+
+@keyframes lancebot-blink-double {
+  0%, 40%, 100%       { transform: scaleY(1); }
+  45%, 48%            { transform: scaleY(0.05); }
+  50%, 58%            { transform: scaleY(1); }
+  62%, 65%            { transform: scaleY(0.05); }
+  67%                 { transform: scaleY(1); }
 }
 
 @keyframes pulse-glow {
@@ -63,7 +95,9 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-.lancebot-float { animation: float 3s ease-in-out infinite; }
+.lancebot-float { animation: float 5s ease-in-out infinite; }
+.lancebot-eye-wander { animation: lancebot-eye-wander 6s ease-in-out infinite; }
+.lancebot-blink-double { animation: lancebot-blink-double 7s ease-in-out infinite; }
 .lancebot-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .bounce-in { animation: bounce-in 0.4s ease-out; }
 
