@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 function extractText(tiptapJson: string): string {
   try {
@@ -20,84 +20,176 @@ function extractText(tiptapJson: string): string {
   }
 }
 
+function buildPrompt(plainText: string, notebookTitle: string, mode: string, quizType?: string): string {
+  if (mode === "cards") {
+    return `You are a flashcard generator. Given these notes, generate comprehensive study flashcards that cover ALL key points.
+
+NOTES (from "${notebookTitle}"):
+${plainText}
+
+Generate as many flashcards as needed to cover every important concept, term, fact, and relationship in the notes — aim for 15–25 cards. Each card has a concept or question on the front and a clear explanation on the back.
+
+Return ONLY valid JSON array, no markdown, no code blocks:
+[
+  {
+    "question": "What is [concept]?",
+    "answer": "Clear explanation of the concept",
+    "type": "flashcard"
+  }
+]
+
+Rules:
+- Cover EVERY key concept, definition, date, person, process, and relationship in the notes
+- Do not skip minor but important details
+- Answers should be concise but complete (1–3 sentences)
+- Do not repeat questions`;
+  }
+
+  // Quiz mode — branch by quizType
+  const type = quizType ?? "multiple_choice";
+
+  const groundingRule = `CRITICAL RULES:
+- Base EVERY question and answer STRICTLY on the notes above. Do NOT use outside knowledge.
+- The correct answer must be something explicitly stated or directly implied in the notes.
+- If the notes don't support a question, skip it and pick a different topic from the notes.`;
+
+  if (type === "multiple_choice") {
+    return `You are a quiz generator. Generate a multiple choice quiz based ONLY on the notes below.
+
+NOTES (from "${notebookTitle}"):
+${plainText}
+
+Generate exactly 10 multiple choice questions as JSON. Each question has 4 options, one correct answer.
+All 4 options must be plausible and related to the topic — no obviously wrong distractors.
+The correct answer must come directly from the notes.
+
+Return ONLY valid JSON array, no markdown, no code blocks:
+[
+  {
+    "question": "...",
+    "answer": "correct option text",
+    "type": "multiple_choice",
+    "options": ["option A", "option B", "option C", "option D"]
+  }
+]
+
+${groundingRule}`;
+  }
+
+  if (type === "identification") {
+    return `You are a quiz generator. Generate an identification quiz based ONLY on the notes below.
+
+NOTES (from "${notebookTitle}"):
+${plainText}
+
+Generate exactly 10 short-answer questions as JSON. Each question requires a specific term, name, or concept as the answer.
+The answer must be something explicitly in the notes.
+
+Return ONLY valid JSON array, no markdown, no code blocks:
+[
+  {
+    "question": "What is the term for...?",
+    "answer": "exact answer from the notes",
+    "type": "short_answer"
+  }
+]
+
+${groundingRule}`;
+  }
+
+  if (type === "fill_blank") {
+    return `You are a quiz generator. Generate a fill-in-the-blank quiz based ONLY on the notes below.
+
+NOTES (from "${notebookTitle}"):
+${plainText}
+
+Generate exactly 10 fill-in-the-blank questions as JSON. Use ___ for the blank.
+The blank must be filled by a key term found in the notes.
+
+Return ONLY valid JSON array, no markdown, no code blocks:
+[
+  {
+    "question": "The ___ is responsible for...",
+    "answer": "exact word or phrase for the blank",
+    "type": "fill_blank"
+  }
+]
+
+${groundingRule}`;
+  }
+
+  // fallback: mixed
+  return `You are a quiz generator. Generate a quiz based ONLY on the notes below.
+
+NOTES (from "${notebookTitle}"):
+${plainText}
+
+Generate exactly 10 quiz questions as JSON. Mix types:
+- "multiple_choice": 4 options, one correct answer (7 questions) — all options plausible
+- "short_answer": open-ended (3 questions)
+
+Return ONLY valid JSON array, no markdown, no code blocks:
+[
+  {
+    "question": "...",
+    "answer": "...",
+    "type": "multiple_choice",
+    "options": ["option A", "option B", "option C", "option D"]
+  }
+]
+
+${groundingRule}`;
+}
+
 export async function POST(req: NextRequest) {
-  const { notebookId, noteContent, notebookTitle, mode } = await req.json();
+  const { notebookId, noteContent, notebookTitle, mode, quizType } = await req.json();
 
   const plainText = extractText(noteContent);
   if (!plainText || plainText.length < 20) {
     return NextResponse.json({ error: "Not enough content" }, { status: 400 });
   }
 
-  const isQuizMode = mode === "quiz";
+  const prompt = buildPrompt(plainText, notebookTitle, mode, quizType);
 
-  const prompt = isQuizMode
-    ? `You are a quiz generator. Given these notes, generate a challenging quiz.
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+  });
 
-NOTES (from "${notebookTitle}"):
-${plainText}
+  const raw = completion.choices[0]?.message?.content?.trim() ?? "";
 
-Generate exactly 10 quiz questions as JSON. Use ONLY these types:
-- "multiple_choice": 4 options, one correct answer (7 questions)
-- "short_answer": open-ended, tests deep understanding (3 questions)
-
-Return ONLY valid JSON array, no markdown, no code blocks:
-[
-  {
-    "question": "...",
-    "answer": "...",
-    "type": "multiple_choice",
-    "options": ["option A", "option B", "option C", "option D"]
-  }
-]
-
-Rules: Make it challenging, use tricky distractors, test application not just recall.`
-    : `You are a smart study card generator. Given these notes, generate a diverse set of study cards.
-
-NOTES (from "${notebookTitle}"):
-${plainText}
-
-Generate exactly 10 study cards as JSON. Mix these types:
-- "multiple_choice": 4 options, one correct answer (4 cards)
-- "fill_blank": question with a blank (use ___) (3 cards)
-- "short_answer": open-ended question (2 cards)
-- "flashcard": concept on front, explanation on back (1 card)
-
-Return ONLY valid JSON array, no markdown, no code blocks:
-[
-  {
-    "question": "...",
-    "answer": "...",
-    "type": "multiple_choice",
-    "options": ["option A", "option B", "option C", "option D"]
-  }
-]
-
-Rules: Focus on key concepts, make wrong options plausible, vary difficulty.`;
-
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text().trim();
-
-  let cards;
+  let questions: { question: string; answer: string; type: string; options?: string[] }[];
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
-    cards = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    questions = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
   } catch {
-    return NextResponse.json({ error: "Failed to parse cards" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to parse questions" }, { status: 500 });
   }
 
-  await fetchMutation(
-    api.cards.replaceAll,
-    {
+  if (mode === "quiz") {
+    const sessionId = await fetchMutation(api.quizSessions.create, {
       notebookId: notebookId as Id<"notebooks">,
-      cards: cards.map((c: { question: string; answer: string; type: string; options?: string[] }) => ({
-        question: c.question,
-        answer: c.answer,
-        type: c.type as "multiple_choice" | "fill_blank" | "short_answer" | "flashcard",
-        options: c.options,
+      quizType: quizType ?? "multiple_choice",
+      questions: questions.map((q) => ({
+        question: q.question,
+        answer: q.answer,
+        type: q.type,
+        options: q.options,
       })),
-    }
-  );
+    });
+    return NextResponse.json({ sessionId });
+  }
 
-  return NextResponse.json({ count: cards.length });
+  await fetchMutation(api.cards.replaceAll, {
+    notebookId: notebookId as Id<"notebooks">,
+    cards: questions.map((q) => ({
+      question: q.question,
+      answer: q.answer,
+      type: q.type as "multiple_choice" | "fill_blank" | "short_answer" | "flashcard",
+      options: q.options,
+    })),
+  });
+
+  return NextResponse.json({ count: questions.length });
 }

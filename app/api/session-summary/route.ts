@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { LANCEBOT_SYSTEM_PROMPT } from "@/lib/lancebot";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
   const { results, notebookTitle } = await req.json();
@@ -16,11 +16,14 @@ Missed: ${incorrect.map((r: { question: string }) => r.question).join(", ") || "
 
 Give a 3-sentence session summary as LanceBot — whimsical, direct, specific about what to review. Plain text only.`;
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: LANCEBOT_SYSTEM_PROMPT,
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: LANCEBOT_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.7,
   });
 
-  const result = await model.generateContent(prompt);
-  return NextResponse.json({ summary: result.response.text().trim() });
+  return NextResponse.json({ summary: completion.choices[0]?.message?.content?.trim() ?? "" });
 }

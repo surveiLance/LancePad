@@ -28,6 +28,7 @@ export default defineSchema({
       v.literal("flashcard")
     ),
     options: v.optional(v.array(v.string())),
+    isManual: v.optional(v.boolean()),
   }).index("by_notebook", ["notebookId"]),
 
   tasks: defineTable({
@@ -37,6 +38,23 @@ export default defineSchema({
     completed: v.boolean(),
     emoji: v.optional(v.string()),
   }).index("by_date", ["date"]),
+
+  quizSessions: defineTable({
+    notebookId: v.id("notebooks"),
+    quizType: v.string(),
+    questions: v.array(v.object({
+      question: v.string(),
+      answer: v.string(),
+      type: v.string(),
+      options: v.optional(v.array(v.string())),
+    })),
+    results: v.optional(v.array(v.object({
+      questionIndex: v.number(),
+      result: v.union(v.literal("correct"), v.literal("incorrect")),
+      userAnswer: v.string(),
+    }))),
+    completedAt: v.optional(v.number()),
+  }).index("by_notebook", ["notebookId"]),
 
   cardReviews: defineTable({
     cardId: v.id("cards"),

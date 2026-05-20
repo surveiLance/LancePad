@@ -33,7 +33,10 @@ export const replaceAll = mutation({
       .query("cards")
       .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
       .collect();
-    for (const card of existing) await ctx.db.delete(card._id);
+    // Only delete previously generated cards — keep manual ones
+    for (const card of existing) {
+      if (!card.isManual) await ctx.db.delete(card._id);
+    }
     for (const card of cards) {
       await ctx.db.insert("cards", { notebookId, ...card });
     }
@@ -51,6 +54,36 @@ export const recordReview = mutation({
   },
   handler: async (ctx, { cardId, result }) => {
     await ctx.db.insert("cardReviews", { cardId, result });
+  },
+});
+
+export const getCountsByNotebook = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("cards").collect();
+    const counts: Record<string, number> = {};
+    for (const card of all) {
+      counts[card.notebookId as string] = (counts[card.notebookId as string] ?? 0) + 1;
+    }
+    return counts;
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("cards") },
+  handler: async (ctx, { id }) => {
+    await ctx.db.delete(id);
+  },
+});
+
+export const add = mutation({
+  args: {
+    notebookId: v.id("notebooks"),
+    question: v.string(),
+    answer: v.string(),
+  },
+  handler: async (ctx, { notebookId, question, answer }) => {
+    return ctx.db.insert("cards", { notebookId, question, answer, type: "flashcard", isManual: true });
   },
 });
 

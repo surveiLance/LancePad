@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buildTutorSystemPrompt } from "@/lib/lancebot";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 function extractText(tiptapJson: string): string {
   try {
@@ -32,25 +32,23 @@ export async function POST(req: NextRequest) {
   const noteText = note?.content ? extractText(note.content) : "";
   const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText);
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: systemPrompt,
-  });
-
-  const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
+  const history = messages.slice(-6).map((m: { role: string; content: string }) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
   }));
 
-  const lastMessage = messages[messages.length - 1];
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessageStream(lastMessage.content);
+  const stream = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "system", content: systemPrompt }, ...history],
+    temperature: 0.7,
+    stream: true,
+  });
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content ?? "";
         if (text) controller.enqueue(encoder.encode(text));
       }
       controller.close();

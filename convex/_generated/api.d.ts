@@ -13,6 +13,7 @@ import type * as cards from "../cards.js";
 import type * as http from "../http.js";
 import type * as notebooks from "../notebooks.js";
 import type * as notes from "../notes.js";
+import type * as quizSessions from "../quizSessions.js";
 import type * as tasks from "../tasks.js";
 
 import type {
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   notebooks: typeof notebooks;
   notes: typeof notes;
+  quizSessions: typeof quizSessions;
   tasks: typeof tasks;
 }>;
 

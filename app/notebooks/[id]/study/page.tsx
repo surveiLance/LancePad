@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
@@ -11,19 +11,35 @@ import LanceBot from "@/components/LanceBot";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
-type QuizResult = { cardId: string; question: string; result: "correct" | "incorrect"; userAnswer: string; correctAnswer: string };
+type QuizResult = { questionIndex: number; question: string; result: "correct" | "incorrect"; userAnswer: string; correctAnswer: string };
 type CardState = "question" | "answered" | "revealed";
+
+type StudyCard = {
+  _id: string;
+  question: string;
+  answer: string;
+  type: string;
+  options?: string[];
+  isQuiz: boolean;
+};
 
 export default function StudyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const notebookId = params.id as Id<"notebooks">;
+  const sessionId = searchParams.get("session") as Id<"quizSessions"> | null;
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
   const allCards = useQuery(api.cards.getByNotebook, { notebookId });
+  const quizSession = useQuery(
+    api.quizSessions.get,
+    sessionId ? { id: sessionId } : "skip"
+  );
   const recordReview = useMutation(api.cards.recordReview);
+  const completeSession = useMutation(api.quizSessions.complete);
 
-  const [cards, setCards] = useState<typeof allCards>([]);
+  const [cards, setCards] = useState<StudyCard[]>([]);
   const [current, setCurrent] = useState(0);
   const [cardState, setCardState] = useState<CardState>("question");
   const [selected, setSelected] = useState("");
@@ -32,24 +48,31 @@ export default function StudyPage() {
   const [gradeFeedback, setGradeFeedback] = useState<{ correct: boolean; partial: boolean; feedback: string } | null>(null);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [botMood, setBotMood] = useState<"idle" | "happy" | "celebrate" | "sad" | "thinking">("idle");
-  const [botMessage, setBotMessage] = useState("");
-  const [summary, setSummary] = useState("");
   const [done, setDone] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summary, setSummary] = useState("");
 
+  // Load cards from either quiz session or flashcard library
   useEffect(() => {
-    if (allCards && allCards.length > 0) {
-      setCards([...allCards]);
-      setBotMood("happy");
-      setBotMessage("Alright, let's see what you've got! 🎯 I'll be right here watching 👀");
+    if (sessionId && quizSession) {
+      setCards(quizSession.questions.map((q, i) => ({
+        _id: `q-${i}`,
+        question: q.question,
+        answer: q.answer,
+        type: q.type,
+        options: q.options,
+        isQuiz: true,
+      })));
+    } else if (!sessionId && allCards && allCards.length > 0) {
+      setCards(allCards.map((c) => ({ ...c, _id: c._id, isQuiz: false })));
     }
-  }, [allCards]);
+  }, [sessionId, quizSession, allCards]);
 
   useEffect(() => {
     if (notebook === null) router.push("/notebooks");
   }, [notebook, router]);
 
-  const card = cards?.[current];
+  const card = cards[current];
 
   function handleMultipleChoice(option: string) {
     if (cardState !== "question" || !card) return;
@@ -57,8 +80,8 @@ export default function StudyPage() {
     setCardState("answered");
     const isCorrect = option === card.answer;
     recordResult(isCorrect, option);
-    if (isCorrect) { setBotMood("celebrate"); setBotMessage("YESSS! That's it! 🎉 Clean!"); }
-    else { setBotMood("sad"); setBotMessage("Ooh, not quite — correct answer is highlighted below 👇"); }
+    if (isCorrect) { setBotMood("celebrate"); }
+    else { setBotMood("sad"); }
   }
 
   async function handleShortAnswer() {
@@ -66,7 +89,6 @@ export default function StudyPage() {
     setGrading(true);
     setCardState("answered");
     setBotMood("thinking");
-    setBotMessage("Hmm, let me check your answer... 🤔");
 
     const res = await fetch("/api/grade-answer", {
       method: "POST",
@@ -79,37 +101,54 @@ export default function StudyPage() {
     const isCorrect = grade.correct || (grade.partial && grade.score >= 70);
     recordResult(isCorrect, shortAnswer);
     setBotMood(grade.correct ? "celebrate" : grade.partial ? "thinking" : "sad");
-    setBotMessage(grade.feedback);
   }
 
   function handleRevealFlashcard(isCorrect: boolean) {
     if (!card) return;
     setCardState("revealed");
     recordResult(isCorrect, isCorrect ? card.answer : "incorrect");
-    if (isCorrect) { setBotMood("celebrate"); setBotMessage("Let's GO! You knew it! 🔥"); }
-    else { setBotMood("sad"); setBotMessage("No worries — now you've seen it, it'll stick! 🧠"); }
+    if (isCorrect) { setBotMood("celebrate"); }
+    else { setBotMood("sad"); }
   }
 
   function recordResult(isCorrect: boolean, userAnswer: string) {
     if (!card) return;
     const result = isCorrect ? "correct" : "incorrect";
-    setResults((prev) => [...prev, { cardId: card._id, question: card.question, result, userAnswer, correctAnswer: card.answer }]);
-    recordReview({ cardId: card._id, result });
+    const idx = current;
+    setResults((prev) => [...prev, { questionIndex: idx, question: card.question, result, userAnswer, correctAnswer: card.answer }]);
+    if (!card.isQuiz) {
+      recordReview({ cardId: card._id as Id<"cards">, result });
+    }
   }
 
-  async function nextCard() {
-    if (!cards) return;
-    if (current + 1 >= cards.length) {
-      setDone(true);
-      setLoadingSummary(true);
-      const res = await fetch("/api/session-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ results, notebookTitle: notebook?.title }),
+  const finishSession = useCallback(async (finalResults: QuizResult[]) => {
+    setDone(true);
+    setLoadingSummary(true);
+
+    if (sessionId) {
+      await completeSession({
+        id: sessionId,
+        results: finalResults.map((r) => ({
+          questionIndex: r.questionIndex,
+          result: r.result,
+          userAnswer: r.userAnswer,
+        })),
       });
-      const { summary: s } = await res.json();
-      setSummary(s);
-      setLoadingSummary(false);
+    }
+
+    const res = await fetch("/api/session-summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ results: finalResults, notebookTitle: notebook?.title }),
+    });
+    const { summary: s } = await res.json();
+    setSummary(s);
+    setLoadingSummary(false);
+  }, [sessionId, completeSession, notebook?.title]);
+
+  async function nextCard() {
+    if (current + 1 >= cards.length) {
+      await finishSession([...results]);
       return;
     }
     setCurrent((c) => c + 1);
@@ -118,7 +157,6 @@ export default function StudyPage() {
     setShortAnswer("");
     setGradeFeedback(null);
     setBotMood("idle");
-    setBotMessage("");
   }
 
   function restartSession() {
@@ -128,8 +166,7 @@ export default function StudyPage() {
     setShortAnswer("");
     setGradeFeedback(null);
     setResults([]);
-    setBotMood("happy");
-    setBotMessage("Round 2! Let's go harder 💪");
+    setBotMood("idle");
     setDone(false);
     setSummary("");
   }
@@ -168,7 +205,8 @@ export default function StudyPage() {
             </div>
           )}
           <div className="flex gap-3 justify-center">
-            <Button onClick={restartSession} variant="secondary"><RotateCcw size={15} />Study again</Button>
+            <Button onClick={restartSession} variant="secondary"><RotateCcw size={15} />Try again</Button>
+            <Link href={`/notebooks/${notebookId}/quizzes`}><Button variant="secondary">Review quizzes</Button></Link>
             <Link href={`/notebooks/${notebookId}/tutor`}><Button>Chat with LanceBot</Button></Link>
           </div>
         </div>
@@ -187,22 +225,18 @@ export default function StudyPage() {
       <header className="border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link href={`/notebooks/${notebookId}`} className="text-gray-500 hover:text-gray-300"><ArrowLeft size={18} /></Link>
-          <div className="flex-1 text-center"><span className="text-gray-400 text-sm">{notebook?.emoji} {notebook?.title}</span></div>
-          <span className="text-gray-500 text-sm">{current + 1} / {cards?.length}</span>
+          <div className="flex-1 text-center">
+            <span className="text-gray-400 text-sm">{notebook?.emoji} {notebook?.title}</span>
+            {sessionId && <span className="ml-2 text-xs text-purple-400 font-semibold">Quiz</span>}
+          </div>
+          <span className="text-gray-500 text-sm">{current + 1} / {cards.length}</span>
         </div>
         <div className="h-1 bg-gray-900">
-          <div className="h-full bg-purple-600 transition-all duration-500" style={{ width: `${((current + 1) / (cards?.length ?? 1)) * 100}%` }} />
+          <div className="h-full bg-purple-600 transition-all duration-500" style={{ width: `${((current + 1) / (cards.length || 1)) * 100}%` }} />
         </div>
       </header>
 
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 flex flex-col gap-6">
-        {botMessage && (
-          <div className="flex items-start gap-3 bg-purple-950/30 border border-purple-900/40 rounded-2xl px-4 py-3 bounce-in">
-            <LanceBot mood={botMood} size={36} animate={botMood === "celebrate"} />
-            <p className="text-purple-200 text-sm leading-relaxed mt-1">{botMessage}</p>
-          </div>
-        )}
-
         <div>
           <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">
             {card.type === "multiple_choice" && "Multiple Choice"}
@@ -293,7 +327,7 @@ export default function StudyPage() {
 
         {cardState !== "question" && !grading && (
           <Button onClick={nextCard} className="self-end">
-            {current + 1 >= (cards?.length ?? 0) ? "See results" : "Next"}
+            {current + 1 >= cards.length ? "See results" : "Next"}
             <ChevronRight size={15} />
           </Button>
         )}

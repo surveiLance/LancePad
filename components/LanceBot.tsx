@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
-type Mood = "idle" | "happy" | "thinking" | "celebrate" | "sad";
+type Mood = "idle" | "happy" | "thinking" | "celebrate" | "sad" | "muted";
 
 interface LanceBotProps {
   mood?: Mood;
@@ -20,6 +20,7 @@ const EYES: Record<Mood, string> = {
   thinking:  "M18 24 Q20 22 22 24 M30 24 Q32 22 34 24",
   celebrate: "M17 23 Q20 19 23 23 M29 23 Q32 19 35 23",
   sad:       "M18 26 Q20 24 22 26 M30 26 Q32 24 34 26",
+  muted:     "M18 25 L22 25 M30 25 L34 25",
 };
 
 const MOUTHS: Record<Mood, string> = {
@@ -28,10 +29,11 @@ const MOUTHS: Record<Mood, string> = {
   thinking:  "M22 33 Q26 32 30 33",
   celebrate: "M19 31 Q26 38 33 31",
   sad:       "M22 36 Q26 32 30 36",
+  muted:     "M21 33 L23 31 L25 33 L27 31 L29 33 L31 31",
 };
 
 const CHEEKS: Record<Mood, boolean> = {
-  idle: false, happy: true, thinking: false, celebrate: true, sad: false,
+  idle: false, happy: true, thinking: false, celebrate: true, sad: false, muted: false,
 };
 
 export default function LanceBot({ mood = "idle", size = 52, className, animate = true, headsetFloat = false, headsetPulse = false }: LanceBotProps) {

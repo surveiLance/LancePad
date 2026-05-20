@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { LANCEBOT_SYSTEM_PROMPT } from "@/lib/lancebot";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
   const { question, modelAnswer, userAnswer, notebookTitle } = await req.json();
@@ -21,13 +21,16 @@ Grade this and respond as LanceBot. Return JSON only, no markdown:
   "feedback": "LanceBot's fun encouraging 2-3 sentence feedback"
 }`;
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: LANCEBOT_SYSTEM_PROMPT,
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: LANCEBOT_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.5,
   });
 
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text().trim();
+  const raw = completion.choices[0]?.message?.content?.trim() ?? "";
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

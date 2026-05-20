@@ -71,6 +71,7 @@ export default function NotebooksPage() {
   const notebooksQuery = useQuery(api.notebooks.list);
   const notebooks = notebooksQuery ?? [];
   const loading = notebooksQuery === undefined;
+  const cardCounts = useQuery(api.cards.getCountsByNotebook) ?? {};
   const createNotebook = useMutation(api.notebooks.create);
   const removeNotebook = useMutation(api.notebooks.remove);
   const toggleTask = useMutation(api.tasks.toggle);
@@ -230,7 +231,7 @@ export default function NotebooksPage() {
                 {notebooks.map((nb, i) => (
                   <div key={nb._id} className="bounce-in" style={{ animationDelay: `${i * 60}ms` }}>
                     <NotebookCard
-                      notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString() }}
+                      notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0 }}
                       onDelete={handleDelete}
                     />
                   </div>

@@ -46,7 +46,6 @@ const PAGE_QUIPS: Record<string, string[]> = {
   ],
 };
 
-// Reacts to what the user is actually typing
 const TYPING_QUIPS = {
   justStarted: [
     "Uy, nag-start na! Let's gooo 📝",
@@ -110,8 +109,19 @@ export default function FloatingLanceBot() {
   const pathname = usePathname();
   const [bubble, setBubble] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
-  const [minimized, setMinimized] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [hiding, setHiding] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [rising, setRising] = useState(false);
 
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpInstruction, setHelpInstruction] = useState("");
+  const [helpResponse, setHelpResponse] = useState("");
+  const [helpLoading, setHelpLoading] = useState(false);
+
+  const mutedRef = useRef(false);
+  const noteContentRef = useRef("");
   const prevLengthRef = useRef(0);
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const milestoneRef = useRef<Set<string>>(new Set());
@@ -120,16 +130,94 @@ export default function FloatingLanceBot() {
   const isNotebookPage = pathname.match(/\/notebooks\/[^/]+$/) !== null;
 
   function showBubble(text: string) {
+    if (mutedRef.current) return;
     setBubble(text);
     setTimeout(() => setBubble(null), 5000);
   }
+
+  function handleShutUp() {
+    mutedRef.current = true;
+    setMuted(true);
+    setBubble("🤐");
+    setTimeout(() => setBubble(null), 1200);
+    setHovering(false);
+  }
+
+  async function handleAskLanceBot() {
+    if (!helpInstruction.trim() || helpLoading) return;
+    setHelpLoading(true);
+    setHelpResponse("");
+
+    let pageContext = "the app";
+    if (pathname.includes("/tutor")) pageContext = "the tutor chat page";
+    else if (pathname.includes("/study")) pageContext = "a quiz/study session";
+    else if (pathname.includes("/quizzes")) pageContext = "the quiz review page";
+    else if (pathname.match(/\/notebooks\/[^/]+$/)) pageContext = "their notebook notes page";
+    else if (pathname === "/calendar") pageContext = "the calendar page";
+
+    const plainNote = noteContentRef.current
+      ? getPlainText(noteContentRef.current)
+      : "";
+
+    const res = await fetch("/api/lancebot-help", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instruction: helpInstruction,
+        noteContent: plainNote || null,
+        pageContext,
+      }),
+    });
+
+    const reader = res.body?.getReader();
+    const decoder = new TextDecoder();
+    if (!reader) { setHelpLoading(false); return; }
+
+    let full = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      setHelpResponse(full);
+    }
+    setHelpLoading(false);
+  }
+
+  function handleHide() {
+    setHovering(false);
+    setHiding(true);
+    setTimeout(() => setHidden(true), 500);
+  }
+
+  function handleRestore() {
+    setHidden(false);
+    setHiding(false);
+    setRising(true);
+    mutedRef.current = false;
+    setMuted(false);
+    // Let the DOM render with rising=true (off-screen), then slide up
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setRising(false);
+        setTimeout(() => {
+          setBubble("Miss me already? 😏");
+          setTimeout(() => setBubble(null), 4000);
+        }, 520);
+      });
+    });
+  }
+
+  // Always track latest note content for the help panel
+  useEffect(() => {
+    const unsub = subscribeNoteContent((raw) => { noteContentRef.current = raw; });
+    return () => { unsub(); };
+  }, []);
 
   useEffect(() => {
     const showTimer = setTimeout(() => setVisible(true), 800);
     return () => clearTimeout(showTimer);
   }, []);
 
-  // Reset milestone tracking when page changes
   useEffect(() => {
     milestoneRef.current = new Set();
     keywordRef.current = new Set();
@@ -137,9 +225,8 @@ export default function FloatingLanceBot() {
     setBubble(null);
   }, [pathname]);
 
-  // Subscribe to note content changes (only on notebook editing page)
   useEffect(() => {
-    if (!isNotebookPage || minimized) return;
+    if (!isNotebookPage || muted) return;
 
     const unsub = subscribeNoteContent((raw) => {
       const text = getPlainText(raw);
@@ -149,13 +236,11 @@ export default function FloatingLanceBot() {
 
       if (len === 0) return;
 
-      // Just started typing
       if (prev === 0 && len > 0) {
         setTimeout(() => showBubble(pick(TYPING_QUIPS.justStarted)), 1500);
         return;
       }
 
-      // Keyword detection
       const lower = text.toLowerCase();
       for (const { words, quip } of TYPING_QUIPS.keywords) {
         const key = words[0];
@@ -166,7 +251,6 @@ export default function FloatingLanceBot() {
         }
       }
 
-      // Length milestones
       if (len >= 600 && !milestoneRef.current.has("long")) {
         milestoneRef.current.add("long");
         showBubble(pick(TYPING_QUIPS.long));
@@ -183,7 +267,6 @@ export default function FloatingLanceBot() {
         return;
       }
 
-      // Typing pause detection (stopped typing for 6s)
       if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
       pauseTimerRef.current = setTimeout(() => {
         if (len > 30) showBubble(pick(TYPING_QUIPS.paused));
@@ -194,11 +277,10 @@ export default function FloatingLanceBot() {
       unsub();
       if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     };
-  }, [isNotebookPage, minimized]);
+  }, [isNotebookPage, muted]);
 
-  // Generic page quips for non-notebook pages
   useEffect(() => {
-    if (isNotebookPage || minimized) return;
+    if (isNotebookPage || muted) return;
 
     let quips: string[];
     if (pathname.includes("/study")) quips = PAGE_QUIPS.study;
@@ -213,40 +295,135 @@ export default function FloatingLanceBot() {
       clearInterval(interval);
       setBubble(null);
     };
-  }, [pathname, isNotebookPage, minimized]);
+  }, [pathname, isNotebookPage, muted]);
 
   if (!visible) return null;
-  if (isNotebookPage) return null;
   if (pathname === "/notebooks") return null;
+  if (isNotebookPage) return null;
+  if (pathname.endsWith("/tutor")) return null;
+
+  // "COME BACK!" restore button when hidden
+  if (hidden) {
+    return (
+      <button
+        onClick={handleRestore}
+        className="fixed bottom-6 left-6 z-50 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-purple-900/60 border border-gray-700 hover:border-purple-600/60 text-xs font-bold text-gray-400 hover:text-purple-300 transition-all hover:-translate-y-0.5"
+      >
+        COME BACK!
+      </button>
+    );
+  }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
-      {bubble && !minimized && (
-        <div className="pointer-events-none relative max-w-[190px] bg-gray-900 border border-purple-800/60 rounded-2xl rounded-br-sm px-3 py-2 text-xs text-purple-200 leading-relaxed shadow-xl shadow-black/40" style={{ animation: "bubble-in 0.3s ease-out" }}>
-          {bubble}
-          <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-gray-900 border-r border-b border-purple-800/60 rotate-45" />
+    <>
+    {/* Help panel — floats above LanceBot */}
+    {helpOpen && (
+      <div className="fixed bottom-24 left-6 z-50 w-80 bg-gray-900 border border-purple-800/50 rounded-2xl shadow-2xl overflow-hidden bounce-in">
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-800">
+          <span className="text-xs font-semibold text-purple-300">✏️ Ask LanceBot</span>
+          <button onClick={() => { setHelpOpen(false); setHelpResponse(""); setHelpInstruction(""); }} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">✕</button>
         </div>
-      )}
+        <div className="p-3 space-y-2">
+          <textarea
+            placeholder="What do you need help with? (edit notes, explain something, find info...)"
+            value={helpInstruction}
+            onChange={(e) => setHelpInstruction(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAskLanceBot(); } }}
+            rows={2}
+            className="w-full bg-gray-800 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none resize-none transition-colors"
+          />
+          {helpResponse && (
+            <div className="bg-gray-800/80 rounded-xl px-3 py-2.5 text-sm text-gray-200 max-h-52 overflow-y-auto leading-relaxed whitespace-pre-wrap">
+              {helpResponse}
+            </div>
+          )}
+          <button
+            onClick={handleAskLanceBot}
+            disabled={!helpInstruction.trim() || helpLoading}
+            className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+          >
+            {helpLoading ? "LanceBot is thinking... 🤔" : "Ask"}
+          </button>
+        </div>
+      </div>
+    )}
 
-      <button
-        className="pointer-events-auto relative cursor-pointer select-none"
-        onClick={() => {
-          if (minimized) {
-            setMinimized(false);
-          } else {
-            setBubble(null);
-            setMinimized(true);
-          }
-        }}
-        title={minimized ? "Bring LanceBot back" : "Hide LanceBot"}
-      >
-        <div className={minimized ? "opacity-40 hover:opacity-70 transition-opacity" : ""}>
-          <LanceBot mood="happy" size={minimized ? 36 : 52} animate={!minimized} />
-        </div>
-        {!minimized && (
-          <div className="absolute inset-0 rounded-full lancebot-glow -z-10 scale-110" />
+    <div
+      className="fixed bottom-6 left-6 z-50 pointer-events-none"
+      style={{
+        transform: (hiding || rising) ? "translateY(120px)" : "translateY(0)",
+        opacity: (hiding || rising) ? 0 : 1,
+        transition: rising
+          ? "transform 0.5s cubic-bezier(0,0,0.2,1), opacity 0.4s ease-out"
+          : "transform 0.45s cubic-bezier(0.4,0,1,1), opacity 0.35s ease-in",
+      }}
+    >
+      {/* Speech bubble — sits above the bot, pointer-events-none so it doesn't block */}
+      <div className="flex flex-col items-start gap-2 mb-2">
+        {bubble && !muted && (
+          <div
+            key={bubble}
+            className="pointer-events-none relative max-w-[190px] bg-gray-900 border border-purple-800/60 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-purple-200 leading-relaxed shadow-xl shadow-black/40"
+            style={{ animation: "bubble-in 0.3s ease-out" }}
+          >
+            {bubble}
+            <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-gray-900 border-l border-b border-purple-800/60 rotate-45" />
+          </div>
         )}
-      </button>
+        {bubble && muted && (
+          <div
+            key="muted-bubble"
+            className="pointer-events-none relative bg-gray-900 border border-gray-700 rounded-2xl rounded-bl-sm px-3 py-2 text-sm shadow-xl"
+            style={{ animation: "bubble-in 0.2s ease-out" }}
+          >
+            🤐
+            <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-gray-900 border-l border-b border-gray-700 rotate-45" />
+          </div>
+        )}
+      </div>
+
+      {/* Hover group — avatar + action buttons in one zone */}
+      <div
+        className="pointer-events-auto flex flex-col items-start gap-2"
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+      >
+        {/* Action buttons appear above avatar on hover */}
+        {hovering && (
+          <div
+            className="flex flex-col gap-1.5"
+            style={{ animation: "bubble-in 0.15s ease-out" }}
+          >
+            <button
+              onClick={() => { setHelpOpen((o) => !o); setHovering(false); }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-900/60 hover:bg-purple-800/70 border border-purple-700/60 text-xs text-purple-200 font-medium transition-colors"
+            >
+              ✏️ Help
+            </button>
+            <div className="flex gap-1.5">
+              <button
+                onClick={muted ? () => { mutedRef.current = false; setMuted(false); } : handleShutUp}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-300 font-medium transition-colors"
+              >
+                {muted ? "🔊 Unmute" : "🤐 Quiet"}
+              </button>
+              <button
+                onClick={handleHide}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-300 font-medium transition-colors"
+              >
+                👋 Hide
+              </button>
+            </div>
+          </div>
+        )}
+
+        <LanceBot
+          mood={muted ? "muted" : "happy"}
+          size={52}
+          animate={!muted}
+        />
+      </div>
     </div>
+    </>
   );
 }
