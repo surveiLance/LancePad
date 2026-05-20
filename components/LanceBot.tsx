@@ -11,6 +11,7 @@ interface LanceBotProps {
   className?: string;
   animate?: boolean;
   headsetFloat?: boolean;
+  headsetPulse?: boolean;
 }
 
 const EYES: Record<Mood, string> = {
@@ -33,7 +34,7 @@ const CHEEKS: Record<Mood, boolean> = {
   idle: false, happy: true, thinking: false, celebrate: true, sad: false,
 };
 
-export default function LanceBot({ mood = "idle", size = 52, className, animate = true, headsetFloat = false }: LanceBotProps) {
+export default function LanceBot({ mood = "idle", size = 52, className, animate = true, headsetFloat = false, headsetPulse = false }: LanceBotProps) {
   const id = `lb-${size}`;
   const outerRef = useRef<SVGGElement>(null);
   const innerRef = useRef<SVGGElement>(null);
@@ -48,7 +49,6 @@ export default function LanceBot({ mood = "idle", size = 52, className, animate 
       const R = 26;
       const dx = R * Math.sin(angle);
       const dy = 14 - R * Math.cos(angle);
-      // translate to orbit position, then spin around headset's own center
       outerRef.current?.setAttribute("transform",
         `translate(${dx.toFixed(2)}, ${dy.toFixed(2)}) rotate(${deg.toFixed(2)}, 26, 19)`
       );
@@ -58,6 +58,44 @@ export default function LanceBot({ mood = "idle", size = 52, className, animate 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [headsetFloat]);
+
+  useEffect(() => {
+    if (!headsetPulse) return;
+    let frame: number;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function runOrbit() {
+      const start = performance.now();
+      const duration = 2800;
+      function tick() {
+        const elapsed = performance.now() - start;
+        const progress = Math.min(elapsed / duration, 1);
+        // ease in-out so it accelerates off and decelerates back
+        const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        const angle = eased * 2 * Math.PI;
+        const R = 26;
+        // formula: starts at (0,0) when angle=0, returns to (0,0) when angle=2π
+        const dx = R * Math.sin(angle);
+        const dy = R * (1 - Math.cos(angle));
+        const deg = eased * 360;
+        outerRef.current?.setAttribute("transform",
+          `translate(${dx.toFixed(2)}, ${dy.toFixed(2)}) rotate(${deg.toFixed(2)}, 26, 19)`
+        );
+        if (progress < 1) {
+          frame = requestAnimationFrame(tick);
+        } else {
+          outerRef.current?.removeAttribute("transform");
+          timer = setTimeout(runOrbit, 5000);
+        }
+      }
+      frame = requestAnimationFrame(tick);
+    }
+
+    timer = setTimeout(runOrbit, 5000);
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+  }, [headsetPulse]);
   return (
     <div
       className={cn("relative inline-flex items-center justify-center", animate && "lancebot-float", className)}

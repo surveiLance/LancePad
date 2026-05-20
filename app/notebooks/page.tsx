@@ -176,7 +176,7 @@ export default function NotebooksPage() {
           <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">{greeting}</h1>
           <p className="text-gray-400 mt-2 text-base">Pick a notebook or start a new one.</p>
           <div className="relative mt-6 flex items-end justify-center">
-            <LanceBot mood={todayTasks.filter(t => !t.completed).length > 0 ? "thinking" : "happy"} size={88} animate />
+            <LanceBot mood={todayTasks.filter(t => !t.completed).length > 0 ? "thinking" : "happy"} size={88} animate headsetPulse />
             {bubble && (
               <div
                 key={bubble}
