@@ -91,6 +91,27 @@ body {
 .lancebot-breathe { animation: breathe 3s ease-in-out infinite; }
 .lancebot-antenna { animation: antenna-pulse 2s ease-in-out infinite; }
 
+@keyframes lancebot-think {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@keyframes lancebot-celebrate {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-10px) scale(1.05); }
+  50% { transform: translateY(-4px) scale(1.02); }
+  75% { transform: translateY(-8px) scale(1.04); }
+}
+
+@keyframes lancebot-sad {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(3px) rotate(2deg); }
+}
+
+.lancebot-think { animation: lancebot-think 2s ease-in-out infinite; }
+.lancebot-celebrate { animation: lancebot-celebrate 0.8s ease-in-out infinite; }
+.lancebot-sad { animation: lancebot-sad 3s ease-in-out infinite; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { @apply bg-gray-900; }

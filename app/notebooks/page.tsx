@@ -18,6 +18,54 @@ function toDateStr(d: Date) {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+const LOADING_QUIPS = [
+  "Hintay ka lang pre, kinukuha ko na lahat 📦",
+  "Loading... o baka nag-aayos lang ako ng buhok ko 💁",
+  "Sandali lang ha, promise mabilis to 😭",
+  "Uy wag kang aalis, andito na ako 👀",
+  "Bro... ako na bahala. Trust the process 🙏",
+  "Konting tiis lang pre, malapit na 💀",
+  "Nag-load na to dati mas mabilis... sus 😤",
+  "Ikaw ba yun? Teka, inaayos ko pa yung notebook mo 📚",
+];
+
+function LoadingScreen() {
+  const [quip, setQuip] = useState(LOADING_QUIPS[0]);
+
+  useEffect(() => {
+    setQuip(LOADING_QUIPS[Math.floor(Math.random() * LOADING_QUIPS.length)]);
+    const interval = setInterval(() => {
+      setQuip(LOADING_QUIPS[Math.floor(Math.random() * LOADING_QUIPS.length)]);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-gray-950 z-50 flex flex-col items-center justify-center gap-6">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-purple-700/10 blur-3xl rounded-full pointer-events-none" />
+      <div className="relative flex flex-col items-center gap-5">
+        <LanceBot mood="thinking" size={110} animate />
+        <div
+          key={quip}
+          className="max-w-xs bg-gray-900 border border-purple-800/50 rounded-2xl px-5 py-3 text-sm text-purple-100 leading-snug text-center shadow-xl"
+          style={{ animation: "bubble-in 0.3s ease-out" }}
+        >
+          {quip}
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-purple-500"
+              style={{ animation: `breathe 1.2s ease-in-out ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function NotebooksPage() {
   const router = useRouter();
   const notebooksQuery = useQuery(api.notebooks.list);
@@ -99,6 +147,8 @@ export default function NotebooksPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([str, tasks]) => ({ date: new Date(str + "T00:00:00"), str, tasks }));
   })();
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-950">
