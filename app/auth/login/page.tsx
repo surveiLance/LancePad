@@ -72,22 +72,6 @@ function LoginForm() {
           <p className="text-gray-400 text-sm mt-1">Your AI study buddy is ready 🚀</p>
         </div>
 
-        <Button
-          type="button"
-          size="lg"
-          className="w-full mb-5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
-          onClick={handleGuest}
-          disabled={guestLoading}
-        >
-          <Zap size={16} />
-          {guestLoading ? "Loading..." : "Try it instantly — no account needed"}
-        </Button>
-
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex-1 h-px bg-gray-800" />
-          <span className="text-gray-600 text-xs">or log in</span>
-          <div className="flex-1 h-px bg-gray-800" />
-        </div>
 
         {justCreated && (
           <p className="text-green-400 text-sm bg-green-950/50 border border-green-900 rounded-lg px-3 py-2 mb-4 text-center">
