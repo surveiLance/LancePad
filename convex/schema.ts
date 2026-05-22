@@ -10,12 +10,20 @@ export default defineSchema({
     username: v.string(),
   }).index("by_user", ["userId"]).index("by_username", ["username"]),
 
-  notebooks: defineTable({
-    userId: v.optional(v.id("users")),
-    title: v.string(),
+  folders: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
     color: v.string(),
     emoji: v.string(),
   }).index("by_user", ["userId"]),
+
+  notebooks: defineTable({
+    userId: v.optional(v.id("users")),
+    folderId: v.optional(v.id("folders")),
+    title: v.string(),
+    color: v.string(),
+    emoji: v.string(),
+  }).index("by_user", ["userId"]).index("by_folder", ["folderId"]),
 
   notes: defineTable({
     notebookId: v.id("notebooks"),

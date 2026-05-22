@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Calendar, Check, ChevronRight, LogOut } from "lucide-react";
+import { Plus, Calendar, Check, ChevronRight, LogOut, FolderPlus, ChevronDown, Trash2 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NotebookCard from "@/components/NotebookCard";
 import CreateNotebookModal from "@/components/CreateNotebookModal";
+import CreateFolderModal from "@/components/CreateFolderModal";
 import LanceBot from "@/components/LanceBot";
 import Link from "next/link";
 
@@ -29,10 +30,17 @@ export default function NotebooksPage() {
   const cardCounts = useQuery(api.cards.getCountsByNotebook) ?? {};
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const username = useQuery(api.userProfiles.getMe) ?? null;
+  const folders = useQuery(api.folders.list) ?? [];
   const createNotebook = useMutation(api.notebooks.create);
   const removeNotebook = useMutation(api.notebooks.remove);
+  const createFolder = useMutation(api.folders.create);
+  const removeFolder = useMutation(api.folders.remove);
+  const setNotebookFolder = useMutation(api.notebooks.setFolder);
   const toggleTask = useMutation(api.tasks.toggle);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [defaultFolderId, setDefaultFolderId] = useState<Id<"folders"> | undefined>(undefined);
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
 
   const now = new Date();
@@ -96,14 +104,36 @@ export default function NotebooksPage() {
     return null;
   }
 
-  async function handleCreate(title: string, color: string, emoji: string) {
-    const id = await createNotebook({ title, color, emoji });
+  async function handleCreate(title: string, color: string, emoji: string, folderId?: Id<"folders">) {
+    const id = await createNotebook({ title, color, emoji, folderId });
     router.push(`/notebooks/${id}`);
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this notebook? This can't be undone.")) return;
     await removeNotebook({ id: id as Id<"notebooks"> });
+  }
+
+  async function handleDeleteFolder(id: Id<"folders">) {
+    if (!confirm("Delete this folder? Notebooks inside will become loose.")) return;
+    await removeFolder({ id });
+  }
+
+  function toggleFolder(id: string) {
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function openCreateInFolder(folderId: Id<"folders">) {
+    setDefaultFolderId(folderId);
+    setShowCreate(true);
+  }
+
+  async function handleMoveToFolder(notebookId: string, folderId: string | undefined) {
+    await setNotebookFolder({ id: notebookId as Id<"notebooks">, folderId: folderId as Id<"folders"> | undefined });
   }
 
   // Group all upcoming tasks by date, excluding today, hide completed
@@ -179,14 +209,23 @@ export default function NotebooksPage() {
           {/* Left: Notebooks */}
           <div>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Your Notebooks</h2>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-purple-900/50 hover:-translate-y-0.5"
-              >
-                <Plus size={15} />
-                New Notebook
-              </button>
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Notebooks</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCreateFolder(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-semibold transition-all border border-gray-700"
+                >
+                  <FolderPlus size={14} />
+                  New Folder
+                </button>
+                <button
+                  onClick={() => { setDefaultFolderId(undefined); setShowCreate(true); }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-purple-900/50 hover:-translate-y-0.5"
+                >
+                  <Plus size={15} />
+                  New Notebook
+                </button>
+              </div>
             </div>
 
             {loading ? (
@@ -195,7 +234,7 @@ export default function NotebooksPage() {
                   <div key={i} className="h-48 bg-gray-900/60 rounded-3xl animate-pulse" />
                 ))}
               </div>
-            ) : notebooks.length === 0 ? (
+            ) : notebooks.length === 0 && folders.length === 0 ? (
               <div className="text-center py-20">
                 <LanceBot mood="thinking" size={72} className="mx-auto mb-4" />
                 <p className="text-white font-bold text-lg">No notebooks yet!</p>
@@ -209,24 +248,86 @@ export default function NotebooksPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {notebooks.map((nb, i) => (
-                  <div key={nb._id} className="bounce-in" style={{ animationDelay: `${i * 60}ms` }}>
-                    <NotebookCard
-                      notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0 }}
-                      onDelete={handleDelete}
-                    />
-                  </div>
-                ))}
-                <button
-                  onClick={() => setShowCreate(true)}
-                  className="group border-2 border-dashed border-gray-800 hover:border-purple-600/60 rounded-3xl flex flex-col items-center justify-center gap-3 text-gray-600 hover:text-purple-400 transition-all min-h-[180px] hover:bg-purple-950/10"
-                >
-                  <div className="w-12 h-12 rounded-2xl border-2 border-dashed border-current flex items-center justify-center transition-transform group-hover:scale-110 group-hover:rotate-6">
-                    <Plus size={20} />
-                  </div>
-                  <span className="text-sm font-semibold">New Notebook</span>
-                </button>
+              <div className="space-y-6">
+                {/* Folders */}
+                {folders.map((folder) => {
+                  const folderNotebooks = notebooks.filter((nb) => nb.folderId === folder._id);
+                  const collapsed = collapsedFolders.has(folder._id);
+                  return (
+                    <div key={folder._id} className="bounce-in">
+                      {/* Folder header */}
+                      <div className="flex items-center gap-2 mb-3 group">
+                        <button onClick={() => toggleFolder(folder._id)} className="flex items-center gap-2 flex-1 min-w-0">
+                          <ChevronDown size={15} className={`text-gray-500 transition-transform flex-shrink-0 ${collapsed ? "-rotate-90" : ""}`} />
+                          <span className="text-base">{folder.emoji}</span>
+                          <span className="font-semibold text-white text-sm truncate">{folder.name}</span>
+                          <span className="text-xs text-gray-600 flex-shrink-0">{folderNotebooks.length} {folderNotebooks.length === 1 ? "notebook" : "notebooks"}</span>
+                        </button>
+                        <button onClick={() => openCreateInFolder(folder._id)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 transition-all p-1 rounded-lg hover:bg-gray-800" title="Add notebook">
+                          <Plus size={14} />
+                        </button>
+                        <button onClick={() => handleDeleteFolder(folder._id)} className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-1 rounded-lg hover:bg-gray-800" title="Delete folder">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {/* Folder contents */}
+                      {!collapsed && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-5 border-l-2 ml-1.5" style={{ borderColor: folder.color + "40" }}>
+                          {folderNotebooks.map((nb, i) => (
+                            <div key={nb._id} className="bounce-in" style={{ animationDelay: `${i * 40}ms` }}>
+                              <NotebookCard
+                                notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0, folderId: nb.folderId }}
+                                onDelete={handleDelete}
+                                folders={folders}
+                                onMoveToFolder={handleMoveToFolder}
+                              />
+                            </div>
+                          ))}
+                          <button onClick={() => openCreateInFolder(folder._id)}
+                            className="group/add border-2 border-dashed border-gray-800 hover:border-purple-600/60 rounded-3xl flex flex-col items-center justify-center gap-2 text-gray-600 hover:text-purple-400 transition-all min-h-[140px] hover:bg-purple-950/10">
+                            <Plus size={18} />
+                            <span className="text-xs font-semibold">Add notebook</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Loose notebooks (no folder) */}
+                {(() => {
+                  const loose = notebooks.filter((nb) => !nb.folderId);
+                  if (loose.length === 0 && folders.length > 0) return null;
+                  return (
+                    <>
+                      {folders.length > 0 && loose.length > 0 && (
+                        <p className="text-xs text-gray-600 uppercase tracking-widest font-semibold">Unfiled</p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {loose.map((nb, i) => (
+                          <div key={nb._id} className="bounce-in" style={{ animationDelay: `${i * 60}ms` }}>
+                            <NotebookCard
+                              notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0, folderId: nb.folderId }}
+                              onDelete={handleDelete}
+                              folders={folders}
+                              onMoveToFolder={handleMoveToFolder}
+                            />
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => { setDefaultFolderId(undefined); setShowCreate(true); }}
+                          className="group border-2 border-dashed border-gray-800 hover:border-purple-600/60 rounded-3xl flex flex-col items-center justify-center gap-3 text-gray-600 hover:text-purple-400 transition-all min-h-[180px] hover:bg-purple-950/10"
+                        >
+                          <div className="w-12 h-12 rounded-2xl border-2 border-dashed border-current flex items-center justify-center transition-transform group-hover:scale-110 group-hover:rotate-6">
+                            <Plus size={20} />
+                          </div>
+                          <span className="text-sm font-semibold">New Notebook</span>
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -392,8 +493,16 @@ export default function NotebooksPage() {
 
       {showCreate && (
         <CreateNotebookModal
-          onClose={() => setShowCreate(false)}
+          onClose={() => { setShowCreate(false); setDefaultFolderId(undefined); }}
           onCreate={handleCreate}
+          folders={folders}
+          defaultFolderId={defaultFolderId}
+        />
+      )}
+      {showCreateFolder && (
+        <CreateFolderModal
+          onClose={() => setShowCreateFolder(false)}
+          onCreate={async (name, color, emoji) => { await createFolder({ name, color, emoji }); }}
         />
       )}
     </div>

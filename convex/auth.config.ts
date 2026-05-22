@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://basic-dalmatian-489.convex.site",
+      domain: process.env.CONVEX_SITE_URL,
       applicationID: "convex",
     },
   ],

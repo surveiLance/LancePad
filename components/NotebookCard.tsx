@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2, ArrowUpRight } from "lucide-react";
+import { Trash2, ArrowUpRight, FolderInput } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+
+interface Folder { _id: string; name: string; emoji: string; color: string; }
 
 interface NotebookCardProps {
   notebook: {
@@ -11,14 +14,27 @@ interface NotebookCardProps {
     emoji: string;
     created_at: string;
     card_count?: number;
+    folderId?: string;
   };
   onDelete: (id: string) => void;
+  folders?: Folder[];
+  onMoveToFolder?: (notebookId: string, folderId: string | undefined) => void;
 }
 
-export default function NotebookCard({ notebook, onDelete }: NotebookCardProps) {
+export default function NotebookCard({ notebook, onDelete, folders = [], onMoveToFolder }: NotebookCardProps) {
   const date = new Date(Number(notebook.created_at)).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
+  const [showFolderMenu, setShowFolderMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowFolderMenu(false);
+    }
+    if (showFolderMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showFolderMenu]);
 
   return (
     <div className="group relative rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02]"
@@ -80,12 +96,48 @@ export default function NotebookCard({ notebook, onDelete }: NotebookCardProps) 
           </div>
         </Link>
 
-        <button
-          onClick={(e) => { e.preventDefault(); onDelete(notebook.id); }}
-          className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-950/50"
-        >
-          <Trash2 size={14} />
-        </button>
+        {/* Action buttons */}
+        <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          {folders.length > 0 && onMoveToFolder && (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={(e) => { e.preventDefault(); setShowFolderMenu((v) => !v); }}
+                className="p-1.5 rounded-lg text-gray-600 hover:text-purple-400 hover:bg-purple-950/50"
+                title="Move to folder"
+              >
+                <FolderInput size={14} />
+              </button>
+              {showFolderMenu && (
+                <div className="absolute right-0 top-8 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[160px] bounce-in">
+                  {notebook.folderId && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); onMoveToFolder(notebook.id, undefined); setShowFolderMenu(false); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-800 flex items-center gap-2"
+                    >
+                      Remove from folder
+                    </button>
+                  )}
+                  {folders.map((f) => (
+                    <button
+                      key={f._id}
+                      onClick={(e) => { e.preventDefault(); onMoveToFolder(notebook.id, f._id); setShowFolderMenu(false); }}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-800 flex items-center gap-2 ${notebook.folderId === f._id ? "text-purple-400" : "text-gray-200"}`}
+                    >
+                      <span>{f.emoji}</span>{f.name}
+                      {notebook.folderId === f._id && <span className="ml-auto text-purple-400">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={(e) => { e.preventDefault(); onDelete(notebook.id); }}
+            className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-950/50"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

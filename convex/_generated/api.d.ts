@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as cards from "../cards.js";
+import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as notebooks from "../notebooks.js";
 import type * as notes from "../notes.js";
@@ -27,6 +28,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   cards: typeof cards;
+  folders: typeof folders;
   http: typeof http;
   notebooks: typeof notebooks;
   notes: typeof notes;

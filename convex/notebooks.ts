@@ -26,11 +26,13 @@ export const create = mutation({
     title: v.string(),
     color: v.string(),
     emoji: v.string(),
+    folderId: v.optional(v.id("folders")),
   },
-  handler: async (ctx, { title, color, emoji }) => {
+  handler: async (ctx, { title, color, emoji, folderId }) => {
     const userId = await getAuthUserId(ctx);
     const notebookId = await ctx.db.insert("notebooks", {
       userId: userId ?? undefined,
+      folderId,
       title,
       color,
       emoji,
@@ -40,6 +42,13 @@ export const create = mutation({
       content: "",
     });
     return notebookId;
+  },
+});
+
+export const setFolder = mutation({
+  args: { id: v.id("notebooks"), folderId: v.optional(v.id("folders")) },
+  handler: async (ctx, { id, folderId }) => {
+    await ctx.db.patch(id, { folderId });
   },
 });
 

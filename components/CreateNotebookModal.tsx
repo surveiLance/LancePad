@@ -5,23 +5,29 @@ import { NOTEBOOK_COLORS, NOTEBOOK_EMOJIS, randomFrom } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { X } from "lucide-react";
+import type { Id } from "@/convex/_generated/dataModel";
+
+interface Folder { _id: Id<"folders">; name: string; emoji: string; color: string; }
 
 interface CreateNotebookModalProps {
   onClose: () => void;
-  onCreate: (title: string, color: string, emoji: string) => Promise<void>;
+  onCreate: (title: string, color: string, emoji: string, folderId?: Id<"folders">) => Promise<void>;
+  folders?: Folder[];
+  defaultFolderId?: Id<"folders">;
 }
 
-export default function CreateNotebookModal({ onClose, onCreate }: CreateNotebookModalProps) {
+export default function CreateNotebookModal({ onClose, onCreate, folders = [], defaultFolderId }: CreateNotebookModalProps) {
   const [title, setTitle] = useState("");
   const [color, setColor] = useState(randomFrom(NOTEBOOK_COLORS));
   const [emoji, setEmoji] = useState(randomFrom(NOTEBOOK_EMOJIS));
+  const [folderId, setFolderId] = useState<Id<"folders"> | undefined>(defaultFolderId);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     setLoading(true);
-    await onCreate(title.trim(), color, emoji);
+    await onCreate(title.trim(), color, emoji, folderId);
     onClose();
   }
 
@@ -92,6 +98,25 @@ export default function CreateNotebookModal({ onClose, onCreate }: CreateNoteboo
               ))}
             </div>
           </div>
+
+          {/* Folder */}
+          {folders.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2 block">Folder (optional)</label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setFolderId(undefined)}
+                  className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all ${!folderId ? "border-purple-500 bg-purple-600/20 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
+                  No folder
+                </button>
+                {folders.map((f) => (
+                  <button key={f._id} type="button" onClick={() => setFolderId(f._id)}
+                    className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-1.5 ${folderId === f._id ? "border-purple-500 bg-purple-600/20 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
+                    <span>{f.emoji}</span>{f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Preview + submit */}
           <div
