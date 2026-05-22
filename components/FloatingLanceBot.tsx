@@ -325,6 +325,7 @@ export default function FloatingLanceBot() {
   if (isNotebookPage) return null;
   if (pathname.endsWith("/tutor")) return null;
   if (pathname.includes("/study")) return null;
+  if (pathname === "/calendar") return null;
   if (pathname.startsWith("/auth")) return null;
 
   // "COME BACK!" restore button when hidden

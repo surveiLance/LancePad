@@ -37,6 +37,7 @@ export const create = mutation({
     title: v.string(),
     date: v.string(),
     notebookId: v.optional(v.id("notebooks")),
+    folderId: v.optional(v.id("folders")),
     emoji: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -60,14 +61,18 @@ export const update = mutation({
     title: v.optional(v.string()),
     emoji: v.optional(v.string()),
     notebookId: v.optional(v.id("notebooks")),
+    folderId: v.optional(v.id("folders")),
     clearNotebook: v.optional(v.boolean()),
+    clearFolder: v.optional(v.boolean()),
   },
-  handler: async (ctx, { id, title, emoji, notebookId, clearNotebook }) => {
+  handler: async (ctx, { id, title, emoji, notebookId, folderId, clearNotebook, clearFolder }) => {
     const patch: Record<string, unknown> = {};
     if (title !== undefined) patch.title = title;
     if (emoji !== undefined) patch.emoji = emoji;
     if (clearNotebook) patch.notebookId = undefined;
     else if (notebookId !== undefined) patch.notebookId = notebookId;
+    if (clearFolder) patch.folderId = undefined;
+    else if (folderId !== undefined) patch.folderId = folderId;
     await ctx.db.patch(id, patch);
   },
 });

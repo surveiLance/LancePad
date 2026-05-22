@@ -49,6 +49,7 @@ export default defineSchema({
     title: v.string(),
     date: v.string(),
     notebookId: v.optional(v.id("notebooks")),
+    folderId: v.optional(v.id("folders")),
     completed: v.boolean(),
     emoji: v.optional(v.string()),
   }).index("by_date", ["date"]).index("by_user", ["userId"]),

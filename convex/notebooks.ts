@@ -52,6 +52,22 @@ export const setFolder = mutation({
   },
 });
 
+export const update = mutation({
+  args: {
+    id: v.id("notebooks"),
+    title: v.optional(v.string()),
+    color: v.optional(v.string()),
+    emoji: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, title, color, emoji }) => {
+    const patch: Record<string, unknown> = {};
+    if (title !== undefined) patch.title = title;
+    if (color !== undefined) patch.color = color;
+    if (emoji !== undefined) patch.emoji = emoji;
+    await ctx.db.patch(id, patch);
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("notebooks") },
   handler: async (ctx, { id }) => {

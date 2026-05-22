@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2, ArrowUpRight, FolderInput } from "lucide-react";
+import { Trash2, ArrowUpRight, FolderInput, Pencil } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 interface Folder { _id: string; name: string; emoji: string; color: string; }
@@ -17,11 +17,12 @@ interface NotebookCardProps {
     folderId?: string;
   };
   onDelete: (id: string) => void;
+  onEdit?: (id: string) => void;
   folders?: Folder[];
   onMoveToFolder?: (notebookId: string, folderId: string | undefined) => void;
 }
 
-export default function NotebookCard({ notebook, onDelete, folders = [], onMoveToFolder }: NotebookCardProps) {
+export default function NotebookCard({ notebook, onDelete, onEdit, folders = [], onMoveToFolder }: NotebookCardProps) {
   const date = new Date(Number(notebook.created_at)).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
@@ -97,18 +98,27 @@ export default function NotebookCard({ notebook, onDelete, folders = [], onMoveT
         </Link>
 
         {/* Action buttons */}
-        <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          {onEdit && (
+            <button
+              onClick={(e) => { e.preventDefault(); onEdit(notebook.id); }}
+              className="p-2 rounded-xl text-gray-500 hover:text-blue-400 hover:bg-blue-950/50"
+              title="Edit notebook"
+            >
+              <Pencil size={15} />
+            </button>
+          )}
           {folders.length > 0 && onMoveToFolder && (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={(e) => { e.preventDefault(); setShowFolderMenu((v) => !v); }}
-                className="p-1.5 rounded-lg text-gray-600 hover:text-purple-400 hover:bg-purple-950/50"
+                className="p-2 rounded-xl text-gray-500 hover:text-purple-400 hover:bg-purple-950/50"
                 title="Move to folder"
               >
-                <FolderInput size={14} />
+                <FolderInput size={15} />
               </button>
               {showFolderMenu && (
-                <div className="absolute right-0 top-8 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[160px] bounce-in">
+                <div className="absolute right-0 top-9 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[160px] bounce-in">
                   {notebook.folderId && (
                     <button
                       onClick={(e) => { e.preventDefault(); onMoveToFolder(notebook.id, undefined); setShowFolderMenu(false); }}
@@ -133,9 +143,9 @@ export default function NotebookCard({ notebook, onDelete, folders = [], onMoveT
           )}
           <button
             onClick={(e) => { e.preventDefault(); onDelete(notebook.id); }}
-            className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-950/50"
+            className="p-2 rounded-xl text-gray-500 hover:text-red-400 hover:bg-red-950/50"
           >
-            <Trash2 size={14} />
+            <Trash2 size={15} />
           </button>
         </div>
       </div>

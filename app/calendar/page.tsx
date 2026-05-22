@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, X, Check, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, X, Check, Trash2, Pencil, Folder, BookOpen, ChevronDown } from "lucide-react";
 import LanceBot from "@/components/LanceBot";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -13,6 +13,122 @@ const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
 const TASK_EMOJIS = ["📚", "✏️", "🧠", "📝", "🎯", "⚡", "🔥", "💡", "📖", "🏆"];
+
+type LinkValue =
+  | { type: "none" }
+  | { type: "folder"; id: string }
+  | { type: "notebook"; id: string };
+
+interface Folder { _id: string; name: string; emoji: string; color: string; }
+interface Notebook { _id: string; title: string; emoji: string; folderId?: string; }
+
+function LinkPicker({
+  value,
+  onChange,
+  folders,
+  notebooks,
+}: {
+  value: LinkValue;
+  onChange: (v: LinkValue) => void;
+  folders: Folder[];
+  notebooks: Notebook[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function close(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const label = (() => {
+    if (value.type === "folder") {
+      const f = folders.find((x) => x._id === value.id);
+      return f ? <span className="flex items-center gap-1.5"><span className="text-base">{f.emoji}</span><span className="text-white font-medium">{f.name}</span><span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 font-semibold">Folder</span></span> : "Folder";
+    }
+    if (value.type === "notebook") {
+      const nb = notebooks.find((x) => x._id === value.id);
+      return nb ? <span className="flex items-center gap-1.5"><span className="text-base">{nb.emoji}</span><span className="text-white font-medium">{nb.title}</span><span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300 font-semibold">Notebook</span></span> : "Notebook";
+    }
+    return <span className="text-gray-500">No link</span>;
+  })();
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-gray-300 transition-colors hover:border-gray-600"
+      >
+        <span>{label}</span>
+        <ChevronDown size={14} className={`text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden bounce-in max-h-64 overflow-y-auto">
+          {/* None */}
+          <button
+            type="button"
+            onClick={() => { onChange({ type: "none" }); setOpen(false); }}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-800 transition-colors ${value.type === "none" ? "text-purple-400" : "text-gray-400"}`}
+          >
+            <X size={13} />
+            No link
+            {value.type === "none" && <Check size={12} className="ml-auto" />}
+          </button>
+
+          {/* Folders section */}
+          {folders.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 flex items-center gap-1.5 border-t border-gray-800">
+                <Folder size={11} className="text-amber-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Folders</span>
+              </div>
+              {folders.map((f) => (
+                <button
+                  key={f._id}
+                  type="button"
+                  onClick={() => { onChange({ type: "folder", id: f._id }); setOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-800 transition-colors border-l-2 ${value.type === "folder" && value.id === f._id ? "text-white bg-amber-950/20" : "text-gray-200"}`}
+                  style={{ borderLeftColor: f.color }}
+                >
+                  <span className="text-lg">{f.emoji}</span>
+                  <span className="text-sm font-medium flex-1">{f.name}</span>
+                  {value.type === "folder" && value.id === f._id && <Check size={13} className="text-amber-400" />}
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Notebooks section */}
+          {notebooks.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 flex items-center gap-1.5 border-t border-gray-800">
+                <BookOpen size={11} className="text-purple-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Notebooks</span>
+              </div>
+              {notebooks.map((nb) => (
+                <button
+                  key={nb._id}
+                  type="button"
+                  onClick={() => { onChange({ type: "notebook", id: nb._id }); setOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-800 transition-colors ${value.type === "notebook" && value.id === nb._id ? "text-white bg-purple-950/20" : "text-gray-200"}`}
+                >
+                  <span className="text-lg">{nb.emoji}</span>
+                  <span className="text-sm font-medium flex-1">{nb.title}</span>
+                  {value.type === "notebook" && value.id === nb._id && <Check size={13} className="text-purple-400" />}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function toDateStr(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -28,15 +144,16 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(now.getMonth());
   const [selectedDate, setSelectedDate] = useState<string>(today());
   const [newTitle, setNewTitle] = useState("");
-  const [newNotebookId, setNewNotebookId] = useState<string>("");
+  const [newLink, setNewLink] = useState<LinkValue>({ type: "none" });
   const [newEmoji, setNewEmoji] = useState("📚");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editEmoji, setEditEmoji] = useState("📚");
-  const [editNotebookId, setEditNotebookId] = useState<string>("");
+  const [editLink, setEditLink] = useState<LinkValue>({ type: "none" });
 
   const notebooks = useQuery(api.notebooks.list) ?? [];
+  const folders = useQuery(api.folders.list) ?? [];
   const selectedTasks = useQuery(api.tasks.getByDate, { date: selectedDate }) ?? [];
   const allTasks = useQuery(api.tasks.getUpcoming, { from: `${year}-01-01`, days: 366 }) ?? [];
 
@@ -71,11 +188,12 @@ export default function CalendarPage() {
     await createTask({
       title: newTitle.trim(),
       date: selectedDate,
-      notebookId: newNotebookId ? newNotebookId as Id<"notebooks"> : undefined,
+      notebookId: newLink.type === "notebook" ? newLink.id as Id<"notebooks"> : undefined,
+      folderId: newLink.type === "folder" ? newLink.id as Id<"folders"> : undefined,
       emoji: newEmoji,
     });
     setNewTitle("");
-    setNewNotebookId("");
+    setNewLink({ type: "none" });
     setShowForm(false);
   }
 
@@ -83,7 +201,9 @@ export default function CalendarPage() {
     setEditingId(task._id);
     setEditTitle(task.title);
     setEditEmoji(task.emoji ?? "📚");
-    setEditNotebookId(task.notebookId ?? "");
+    if (task.folderId) setEditLink({ type: "folder", id: task.folderId });
+    else if (task.notebookId) setEditLink({ type: "notebook", id: task.notebookId });
+    else setEditLink({ type: "none" });
   }
 
   async function saveEdit() {
@@ -92,17 +212,17 @@ export default function CalendarPage() {
       id: editingId as Id<"tasks">,
       title: editTitle.trim(),
       emoji: editEmoji,
-      ...(editNotebookId
-        ? { notebookId: editNotebookId as Id<"notebooks"> }
-        : { clearNotebook: true }),
+      ...(editLink.type === "notebook" ? { notebookId: editLink.id as Id<"notebooks">, clearFolder: true } : { clearNotebook: true }),
+      ...(editLink.type === "folder" ? { folderId: editLink.id as Id<"folders">, clearNotebook: true } : { clearFolder: true }),
     });
     setEditingId(null);
   }
 
   const todayStr = today();
-  const selectedTasksNotebook = selectedTasks.map((t) => ({
+  const selectedTasksEnriched = selectedTasks.map((t) => ({
     ...t,
     notebook: notebooks.find((n) => n._id === t.notebookId),
+    folder: folders.find((f) => f._id === t.folderId),
   }));
 
   return (
@@ -217,16 +337,7 @@ export default function CalendarPage() {
                       className="flex-1 bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none transition-colors"
                     />
                   </div>
-                  <select
-                    value={newNotebookId}
-                    onChange={(e) => setNewNotebookId(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none transition-colors"
-                  >
-                    <option value="">No notebook linked</option>
-                    {notebooks.map((nb) => (
-                      <option key={nb._id} value={nb._id}>{nb.emoji} {nb.title}</option>
-                    ))}
-                  </select>
+                  <LinkPicker value={newLink} onChange={setNewLink} folders={folders} notebooks={notebooks} />
                   <div className="flex gap-2">
                     <button onClick={handleCreate} className="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors">
                       Add
@@ -239,14 +350,14 @@ export default function CalendarPage() {
               )}
 
               {/* Task list */}
-              {selectedTasksNotebook.length === 0 ? (
+              {selectedTasksEnriched.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-gray-500 text-sm">No tasks for this day.</p>
                   <p className="text-gray-600 text-xs mt-1">Click "Add task" to get started 🎯</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {selectedTasksNotebook.map((task) => (
+                  {selectedTasksEnriched.map((task) => (
                     <div key={task._id}>
                       {editingId === task._id ? (
                         /* ── Inline edit form ── */
@@ -268,16 +379,7 @@ export default function CalendarPage() {
                               className="flex-1 bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-1.5 text-white text-sm placeholder-gray-500 focus:outline-none transition-colors"
                             />
                           </div>
-                          <select
-                            value={editNotebookId}
-                            onChange={(e) => setEditNotebookId(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-1.5 text-sm text-gray-300 focus:outline-none transition-colors"
-                          >
-                            <option value="">No notebook linked</option>
-                            {notebooks.map((nb) => (
-                              <option key={nb._id} value={nb._id}>{nb.emoji} {nb.title}</option>
-                            ))}
-                          </select>
+                          <LinkPicker value={editLink} onChange={setEditLink} folders={folders} notebooks={notebooks} />
                           <div className="flex gap-2">
                             <button onClick={saveEdit} className="flex-1 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors">
                               Save
@@ -311,8 +413,16 @@ export default function CalendarPage() {
                             <p className={`text-sm font-medium truncate ${task.completed ? "line-through text-gray-500" : "text-white"}`}>
                               {task.title}
                             </p>
-                            {task.notebook && (
-                              <Link href={`/notebooks/${task.notebookId}`} className="text-xs text-purple-400 hover:text-purple-300 truncate block">
+                            {task.folder && (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-400 truncate">
+                                <Folder size={10} />
+                                {task.folder.emoji} {task.folder.name}
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-amber-900/40 text-amber-300 font-semibold">Folder</span>
+                              </span>
+                            )}
+                            {task.notebook && !task.folder && (
+                              <Link href={`/notebooks/${task.notebookId}`} className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 truncate">
+                                <BookOpen size={10} />
                                 {task.notebook.emoji} {task.notebook.title}
                               </Link>
                             )}
@@ -345,7 +455,7 @@ export default function CalendarPage() {
                   ? "Walang tasks dito. Mag-schedule na tayo ng study session! 📅"
                   : selectedTasks.every((t) => t.completed)
                   ? "Grabe! Natapos mo lahat! Ang galing mo talaga 🎉"
-                  : `${selectedTasks.filter(t => !t.completed).length} tasks left. Kaya mo yan, pre! 💪`}
+                  : `${selectedTasks.filter(t => !t.completed).length} ${selectedTasks.filter(t => !t.completed).length === 1 ? "task" : "tasks"} left. Kaya mo yan, pre! 💪`}
               </div>
             </div>
           </div>

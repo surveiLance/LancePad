@@ -10,6 +10,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import NotebookCard from "@/components/NotebookCard";
 import CreateNotebookModal from "@/components/CreateNotebookModal";
 import CreateFolderModal from "@/components/CreateFolderModal";
+import EditNotebookModal from "@/components/EditNotebookModal";
 import LanceBot from "@/components/LanceBot";
 import Link from "next/link";
 
@@ -33,6 +34,7 @@ export default function NotebooksPage() {
   const folders = useQuery(api.folders.list) ?? [];
   const createNotebook = useMutation(api.notebooks.create);
   const removeNotebook = useMutation(api.notebooks.remove);
+  const updateNotebook = useMutation(api.notebooks.update);
   const createFolder = useMutation(api.folders.create);
   const removeFolder = useMutation(api.folders.remove);
   const setNotebookFolder = useMutation(api.notebooks.setFolder);
@@ -41,6 +43,7 @@ export default function NotebooksPage() {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [defaultFolderId, setDefaultFolderId] = useState<Id<"folders"> | undefined>(undefined);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [editingNotebook, setEditingNotebook] = useState<{ id: string; title: string; color: string; emoji: string } | null>(null);
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
 
   const now = new Date();
@@ -134,6 +137,15 @@ export default function NotebooksPage() {
 
   async function handleMoveToFolder(notebookId: string, folderId: string | undefined) {
     await setNotebookFolder({ id: notebookId as Id<"notebooks">, folderId: folderId as Id<"folders"> | undefined });
+  }
+
+  function handleOpenEdit(id: string) {
+    const nb = notebooks.find((n) => n._id === id);
+    if (nb) setEditingNotebook({ id, title: nb.title, color: nb.color, emoji: nb.emoji });
+  }
+
+  async function handleSaveEdit(id: string, title: string, color: string, emoji: string) {
+    await updateNotebook({ id: id as Id<"notebooks">, title, color, emoji });
   }
 
   // Group all upcoming tasks by date, excluding today, hide completed
@@ -279,6 +291,7 @@ export default function NotebooksPage() {
                               <NotebookCard
                                 notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0, folderId: nb.folderId }}
                                 onDelete={handleDelete}
+                                onEdit={handleOpenEdit}
                                 folders={folders}
                                 onMoveToFolder={handleMoveToFolder}
                               />
@@ -310,6 +323,7 @@ export default function NotebooksPage() {
                             <NotebookCard
                               notebook={{ ...nb, id: nb._id, created_at: nb._creationTime.toString(), card_count: cardCounts[nb._id as string] ?? 0, folderId: nb.folderId }}
                               onDelete={handleDelete}
+                              onEdit={handleOpenEdit}
                               folders={folders}
                               onMoveToFolder={handleMoveToFolder}
                             />
@@ -386,13 +400,21 @@ export default function NotebooksPage() {
                           <div className="space-y-2">
                             {dayTasks.slice(0, 4).map((t) => {
                               const nb = notebooks.find((n) => n._id === t.notebookId);
+                              const fd = folders.find((f) => f._id === t.folderId);
                               return (
                                 <div key={t._id}>
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs">{t.emoji ?? "📚"}</span>
                                     <span className={`text-xs truncate ${t.completed ? "line-through text-gray-500" : "text-gray-200"}`}>{t.title}</span>
                                   </div>
-                                  {nb && (
+                                  {fd && (
+                                    <div className="mt-0.5 ml-5 flex items-center gap-1.5">
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: fd.color + "25", color: fd.color }}>
+                                        {fd.emoji} {fd.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {nb && !fd && (
                                     <div className="mt-0.5 ml-5 flex items-center gap-1.5">
                                       <span className="text-[10px] text-gray-500">{nb.emoji} {nb.title}</span>
                                       <Link
@@ -461,13 +483,21 @@ export default function NotebooksPage() {
                       <div className="space-y-2">
                         {tasks.map((task) => {
                           const nb = notebooks.find((n) => n._id === task.notebookId);
+                          const fd = folders.find((f) => f._id === task.folderId);
                           return (
                             <div key={task._id}>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm">{task.emoji ?? "📚"}</span>
                                 <span className="text-sm text-gray-300 truncate">{task.title}</span>
                               </div>
-                              {nb && (
+                              {fd && (
+                                <div className="mt-1 ml-6">
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg" style={{ background: fd.color + "25", color: fd.color }}>
+                                    {fd.emoji} {fd.name} · Folder
+                                  </span>
+                                </div>
+                              )}
+                              {nb && !fd && (
                                 <div className="mt-1 ml-6 flex items-center gap-2">
                                   <span className="text-xs text-gray-500">{nb.emoji} {nb.title}</span>
                                   <Link
@@ -503,6 +533,13 @@ export default function NotebooksPage() {
         <CreateFolderModal
           onClose={() => setShowCreateFolder(false)}
           onCreate={async (name, color, emoji) => { await createFolder({ name, color, emoji }); }}
+        />
+      )}
+      {editingNotebook && (
+        <EditNotebookModal
+          notebook={editingNotebook}
+          onClose={() => setEditingNotebook(null)}
+          onSave={handleSaveEdit}
         />
       )}
     </div>
