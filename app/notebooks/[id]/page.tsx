@@ -190,7 +190,7 @@ export default function NotebookPage() {
   if (notebook === null) return null;
 
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden fade-slide-up">
       {/* Header */}
       <header className="border-b border-gray-900 bg-gray-950/80 backdrop-blur-md flex-shrink-0">
         <div className="px-4 h-14 flex items-center gap-3">
