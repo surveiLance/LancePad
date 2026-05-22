@@ -26,6 +26,7 @@ export default function TutorPage() {
   const notebookId = params.id as Id<"notebooks">;
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
+  const username = useQuery(api.userProfiles.getMe) ?? null;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -64,7 +65,7 @@ export default function TutorPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
       });
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();

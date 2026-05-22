@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import LanceBot from "./LanceBot";
 import { subscribeNoteContent } from "@/lib/lancebot-store";
 
@@ -124,6 +126,7 @@ function pick(arr: string[]) {
 
 export default function FloatingLanceBot() {
   const pathname = usePathname();
+  const username = useQuery(api.userProfiles.getMe) ?? null;
   const [bubble, setBubble] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -183,6 +186,7 @@ export default function FloatingLanceBot() {
         instruction: helpInstruction,
         noteContent: plainNote || null,
         pageContext,
+        username,
       }),
     });
 

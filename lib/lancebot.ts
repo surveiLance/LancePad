@@ -37,8 +37,9 @@ The facts (share one at a time when relevant):
 
 Keep it short, keep it fun. Never monologue. One fact, one reaction, then bounce it back to them.`;
 
-export function buildTutorSystemPrompt(notebookTitle: string, noteContent: string): string {
-  return `${LANCEBOT_SYSTEM_PROMPT}
+export function buildTutorSystemPrompt(notebookTitle: string, noteContent: string, username?: string | null): string {
+  const userLine = username ? `\n\nThe student's name is ${username}. Address them by name occasionally — keep it personal and fun.` : "";
+  return `${LANCEBOT_SYSTEM_PROMPT}${userLine}
 
 ---
 DECK CONTEXT — You are the AI tutor for the notebook: "${notebookTitle}"
@@ -48,4 +49,11 @@ Here are the notes/content from this deck that you should use as your knowledge 
 ${noteContent || "No notes have been added yet — encourage the user to add some notes to the notebook so you can help them study!"}
 
 Stick to this content when answering questions. You can elaborate and explain, but ground your answers in these notes.`;
+}
+
+export function buildHelpSystemPrompt(username?: string | null): string {
+  const userLine = username ? `\n\nThe student's name is ${username}. Address them by name occasionally — keep it personal and fun.` : "";
+  return `${LANCEBOT_SYSTEM_PROMPT}${userLine}
+
+You are LanceBot helping a student directly. Be specific, practical, and brief (3–6 sentences max unless asked for more).`;
 }

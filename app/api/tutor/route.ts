@@ -22,7 +22,7 @@ function extractText(tiptapJson: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, notebookId, notebookTitle } = await req.json();
+  const { messages, notebookId, notebookTitle, username } = await req.json();
 
   const note = await fetchQuery(
     api.notes.getByNotebook,
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   );
 
   const noteText = note?.content ? extractText(note.content) : "";
-  const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText);
+  const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText, username);
 
   const history = messages.slice(-6).map((m: { role: string; content: string }) => ({
     role: m.role as "user" | "assistant",

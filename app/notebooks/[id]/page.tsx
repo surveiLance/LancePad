@@ -40,6 +40,7 @@ export default function NotebookPage() {
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
   const note = useQuery(api.notes.getByNotebook, { notebookId });
   const savedMessages = useQuery(api.tutorMessages.getByNotebook, { notebookId });
+  const username = useQuery(api.userProfiles.getMe) ?? null;
   const saveNote = useMutation(api.notes.save);
   const addMessage = useMutation(api.tutorMessages.add);
   const clearMessages = useMutation(api.tutorMessages.clear);
@@ -156,7 +157,7 @@ export default function NotebookPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
       });
       if (!res.body) throw new Error("No stream");
       setGroqUsage({

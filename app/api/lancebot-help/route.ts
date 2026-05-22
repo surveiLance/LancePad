@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
-import { LANCEBOT_SYSTEM_PROMPT } from "@/lib/lancebot";
+import { buildHelpSystemPrompt } from "@/lib/lancebot";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { instruction, noteContent, pageContext } = await req.json();
+  const { instruction, noteContent, pageContext, username } = await req.json();
 
   const contextBlock = noteContent
     ? `\nThe user's current notes:\n"""\n${noteContent.slice(0, 2000)}\n"""`
@@ -15,9 +15,7 @@ export async function POST(req: NextRequest) {
     ? `\nThe user is currently on: ${pageContext}`
     : "";
 
-  const systemPrompt = `${LANCEBOT_SYSTEM_PROMPT}
-
-You are LanceBot helping a student directly. Be specific, practical, and brief (3–6 sentences max unless asked for more).${pageBlock}${contextBlock}`;
+  const systemPrompt = `${buildHelpSystemPrompt(username)}${pageBlock}${contextBlock}`;
 
   const stream = await groq.chat.completions.create({
     model: "llama-3.1-8b-instant",

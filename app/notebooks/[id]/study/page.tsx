@@ -33,6 +33,7 @@ export default function StudyPage() {
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
   const allCards = useQuery(api.cards.getByNotebook, { notebookId });
+  const username = useQuery(api.userProfiles.getMe) ?? null;
   const quizSession = useQuery(
     api.quizSessions.get,
     sessionId ? { id: sessionId } : "skip"
@@ -119,7 +120,7 @@ export default function StudyPage() {
     const res = await fetch("/api/grade-answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: card.question, modelAnswer: card.answer, userAnswer: shortAnswer, notebookTitle: notebook?.title }),
+      body: JSON.stringify({ question: card.question, modelAnswer: card.answer, userAnswer: shortAnswer, notebookTitle: notebook?.title, username }),
     });
     const grade = await res.json();
     setGradeFeedback(grade);
@@ -168,7 +169,7 @@ export default function StudyPage() {
     const res = await fetch("/api/session-summary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ results: finalResults, notebookTitle: notebook?.title }),
+      body: JSON.stringify({ results: finalResults, notebookTitle: notebook?.title, username }),
     });
     const { summary: s } = await res.json();
     setSummary(s);

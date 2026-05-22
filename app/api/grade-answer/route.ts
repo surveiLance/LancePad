@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
-import { LANCEBOT_SYSTEM_PROMPT } from "@/lib/lancebot";
+import { buildHelpSystemPrompt } from "@/lib/lancebot";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { question, modelAnswer, userAnswer, notebookTitle } = await req.json();
+  const { question, modelAnswer, userAnswer, notebookTitle, username } = await req.json();
 
   const prompt = `You are grading a short-answer response for a student studying "${notebookTitle}".
 
@@ -24,7 +24,7 @@ Grade this and respond as LanceBot. Return JSON only, no markdown:
   const completion = await groq.chat.completions.create({
     model: "llama-3.1-8b-instant",
     messages: [
-      { role: "system", content: LANCEBOT_SYSTEM_PROMPT },
+      { role: "system", content: buildHelpSystemPrompt(username) },
       { role: "user", content: prompt },
     ],
     temperature: 0.5,
