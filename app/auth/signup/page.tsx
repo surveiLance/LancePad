@@ -4,16 +4,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import LanceBot from "@/components/LanceBot";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import { Zap } from "lucide-react";
+import { Zap, Eye, EyeOff } from "lucide-react";
+
+async function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export default function SignupPage() {
   const router = useRouter();
   const { signIn } = useAuthActions();
+  const createProfile = useMutation(api.userProfiles.create);
+
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
@@ -21,12 +33,42 @@ export default function SignupPage() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!username.trim()) { setError("Username is required."); return; }
+    if (username.length < 3) { setError("Username must be at least 3 characters."); return; }
+    if (password !== confirm) { setError("Passwords don't match."); return; }
     setLoading(true);
     try {
       await signIn("password", { email, password, flow: "signUp" });
-      router.push("/notebooks");
-    } catch {
-      setError("Couldn't create account. Try a stronger password.");
+
+      // Retry createProfile in case auth token hasn't propagated to Convex yet
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          await createProfile({ username: username.trim() });
+          router.push("/notebooks");
+          return;
+        } catch (err) {
+          lastErr = err;
+          const msg = err instanceof Error ? err.message.toLowerCase() : "";
+          if (msg.includes("not authenticated")) {
+            await delay(200 * (attempt + 1));
+            continue;
+          }
+          throw err;
+        }
+      }
+      throw lastErr;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.toLowerCase() : "";
+      if (msg.includes("already taken")) {
+        setError("That username is already taken. Try another.");
+      } else if (msg.includes("already") || msg.includes("exists")) {
+        setError("An account with this email already exists. Try logging in.");
+      } else if (msg.includes("password") || msg.includes("8")) {
+        setError("Password must be at least 8 characters.");
+      } else {
+        setError("Couldn't create account. Please try again.");
+      }
       setLoading(false);
     }
   }
@@ -41,6 +83,9 @@ export default function SignupPage() {
       setGuestLoading(false);
     }
   }
+
+  const passwordsTyped = password.length > 0 && confirm.length > 0;
+  const mismatch = passwordsTyped && password !== confirm;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
@@ -76,18 +121,56 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <Input
-            type="password"
-            placeholder="Password (min 8 chars)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
+            type="text"
+            placeholder="Username (min 3 chars)"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
           />
+
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password (min 8 chars)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          <div className="relative">
+            <Input
+              type={showConfirm ? "text" : "password"}
+              placeholder="Confirm password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className={mismatch ? "border-red-600 focus:border-red-500 pr-10" : "pr-10"}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+              tabIndex={-1}
+            >
+              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {mismatch && <p className="text-red-400 text-xs -mt-2">Passwords don&apos;t match</p>}
+
           {error && (
             <p className="text-red-400 text-sm bg-red-950/50 border border-red-900 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
-          <Button type="submit" size="lg" variant="secondary" className="w-full" disabled={loading}>
+          <Button type="submit" size="lg" variant="secondary" className="w-full" disabled={loading || mismatch}>
             {loading ? "Creating account..." : "Create free account"}
           </Button>
         </form>

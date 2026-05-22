@@ -5,6 +5,11 @@ import { authTables } from "@convex-dev/auth/server";
 export default defineSchema({
   ...authTables,
 
+  userProfiles: defineTable({
+    userId: v.id("users"),
+    username: v.string(),
+  }).index("by_user", ["userId"]).index("by_username", ["username"]),
+
   notebooks: defineTable({
     userId: v.optional(v.id("users")),
     title: v.string(),
@@ -32,12 +37,13 @@ export default defineSchema({
   }).index("by_notebook", ["notebookId"]),
 
   tasks: defineTable({
+    userId: v.optional(v.id("users")),
     title: v.string(),
     date: v.string(),
     notebookId: v.optional(v.id("notebooks")),
     completed: v.boolean(),
     emoji: v.optional(v.string()),
-  }).index("by_date", ["date"]),
+  }).index("by_date", ["date"]).index("by_user", ["userId"]),
 
   quizSessions: defineTable({
     notebookId: v.id("notebooks"),

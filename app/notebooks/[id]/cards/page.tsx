@@ -9,7 +9,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import LanceBot from "@/components/LanceBot";
 import LoadingScreen from "@/components/LoadingScreen";
-import GroqUsageBadge from "@/components/GroqUsageBadge";
 import { setGroqUsage } from "@/lib/groq-usage-store";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -132,7 +131,6 @@ export default function CardsPage() {
           <span className="text-white font-semibold truncate flex-1 text-sm">
             {notebook.emoji} {notebook.title}
           </span>
-          <GroqUsageBadge />
           {sortedCards.length > 0 && (
             <span className="text-xs text-gray-500">{sortedCards.length} card{sortedCards.length !== 1 ? "s" : ""}</span>
           )}

@@ -16,6 +16,7 @@ import type * as notes from "../notes.js";
 import type * as quizSessions from "../quizSessions.js";
 import type * as tasks from "../tasks.js";
 import type * as tutorMessages from "../tutorMessages.js";
+import type * as userProfiles from "../userProfiles.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   quizSessions: typeof quizSessions;
   tasks: typeof tasks;
   tutorMessages: typeof tutorMessages;
+  userProfiles: typeof userProfiles;
 }>;
 
 /**

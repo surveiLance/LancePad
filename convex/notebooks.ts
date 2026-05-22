@@ -1,10 +1,16 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    return ctx.db.query("notebooks").order("desc").collect();
+    const userId = await getAuthUserId(ctx);
+    return ctx.db
+      .query("notebooks")
+      .withIndex("by_user", (q) => q.eq("userId", userId ?? undefined))
+      .order("desc")
+      .collect();
   },
 });
 
@@ -22,7 +28,9 @@ export const create = mutation({
     emoji: v.string(),
   },
   handler: async (ctx, { title, color, emoji }) => {
+    const userId = await getAuthUserId(ctx);
     const notebookId = await ctx.db.insert("notebooks", {
+      userId: userId ?? undefined,
       title,
       color,
       emoji,

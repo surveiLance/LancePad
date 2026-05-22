@@ -16,7 +16,6 @@ import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
 import { setNoteContent as pushNoteContent } from "@/lib/lancebot-store";
 import { setGroqUsage } from "@/lib/groq-usage-store";
-import GroqUsageBadge from "@/components/GroqUsageBadge";
 import type { ChatMessage } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +56,7 @@ export default function NotebookPage() {
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [botMood, setBotMood] = useState<"idle" | "happy" | "thinking" | "celebrate" | "sad">("happy");
+  const [mobileTab, setMobileTab] = useState<"notes" | "chat">("notes");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
@@ -206,15 +206,30 @@ export default function NotebookPage() {
             {saving ? <><Loader2 size={11} className="animate-spin" /> Saving...</> :
              saved  ? <><Save size={11} className="text-green-400" /> Saved</>   : null}
           </div>
-          <GroqUsageBadge />
         </div>
       </header>
+
+      {/* Mobile tab bar */}
+      <div className="md:hidden flex border-b border-gray-800 flex-shrink-0">
+        <button
+          onClick={() => setMobileTab("notes")}
+          className={cn("flex-1 py-2.5 text-sm font-semibold transition-colors", mobileTab === "notes" ? "text-white border-b-2 border-purple-500" : "text-gray-500")}
+        >
+          📝 Notes
+        </button>
+        <button
+          onClick={() => setMobileTab("chat")}
+          className={cn("flex-1 py-2.5 text-sm font-semibold transition-colors", mobileTab === "chat" ? "text-purple-400 border-b-2 border-purple-500" : "text-gray-500")}
+        >
+          🤖 LanceBot
+        </button>
+      </div>
 
       {/* Split body */}
       <div className="flex-1 flex min-h-0">
 
         {/* Left — Notes */}
-        <div className="flex-1 flex flex-col min-h-0 border-r border-gray-800/60 p-4 gap-3 relative">
+        <div className={cn("flex-1 flex-col min-h-0 border-r border-gray-800/60 p-4 gap-3 relative", "md:flex", mobileTab === "notes" ? "flex" : "hidden")}>
           <div className="flex-shrink-0 grid grid-cols-2 gap-2">
             <Link
               href={`/notebooks/${notebookId}/cards`}
@@ -261,7 +276,7 @@ export default function NotebookPage() {
         </div>
 
         {/* Right — LanceBot chat */}
-        <div className="w-80 xl:w-96 flex flex-col min-h-0 bg-gray-950">
+        <div className={cn("w-full md:w-80 xl:w-96 flex-col min-h-0 bg-gray-950", "md:flex", mobileTab === "chat" ? "flex" : "hidden")}>
           {/* Bot header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800/60 flex-shrink-0">
             <LanceBot mood={botMood} size={42} animate={botMood === "thinking"} />

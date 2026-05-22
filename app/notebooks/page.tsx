@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Calendar, Check, ChevronRight } from "lucide-react";
+import { Plus, Calendar, Check, ChevronRight, LogOut } from "lucide-react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -22,10 +23,13 @@ const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"
 
 export default function NotebooksPage() {
   const router = useRouter();
+  const { signOut } = useAuthActions();
   const notebooksQuery = useQuery(api.notebooks.list);
   const notebooks = notebooksQuery ?? [];
   const loading = notebooksQuery === undefined;
   const cardCounts = useQuery(api.cards.getCountsByNotebook) ?? {};
+  const profile = useQuery(api.userProfiles.get);
+  const username = profile?.username ?? null;
   const createNotebook = useMutation(api.notebooks.create);
   const removeNotebook = useMutation(api.notebooks.remove);
   const toggleTask = useMutation(api.tasks.toggle);
@@ -44,11 +48,12 @@ export default function NotebooksPage() {
     return { date: d, str: toDateStr(d) };
   });
 
+  const name = username ? username : "Bro";
   const greetings = [
-    "Ready to lock in? 🔒",
-    "What are we cooking today? 🍳",
-    "Back again! Let's get it 🚀",
-    "Your brain is about to level up 🧠",
+    `Ready to lock in, ${name}? 🔒`,
+    `What are we cooking today, ${name}? 🍳`,
+    `Back again, ${name}! Let's get it 🚀`,
+    `Your brain's about to level up 🧠`,
   ];
   const greeting = greetings[Math.floor(Date.now() / 86400000) % greetings.length];
 
@@ -59,18 +64,18 @@ export default function NotebooksPage() {
     const upcoming = upcomingTasks.filter((t) => t.date !== todayStr && !t.completed);
 
     const quips = pending.length > 0 ? [
-      `Uy! May ${pending.length} task ka pa ngayon. Sige na pre 👀`,
-      `${pending[0]?.title}? Di pa tapos yan! Tara na 💪`,
+      `Uy ${name}! May ${pending.length} task ka pa ngayon. Sige na pre 👀`,
+      `${pending[0]?.title}? Di pa tapos yan, ${name}! Tara na 💪`,
       `Huwag mong kalimutan yung tasks mo ngayon ha! 📅`,
     ] : upcoming.length > 0 ? [
-      `May ${upcoming.length} incoming tasks ka pa. Plan na! 📅`,
+      `May ${upcoming.length} incoming tasks ka pa. Plan na, ${name}! 📅`,
       `Uy, may darating na tasks. Mag-aral na habang maaga 📚`,
-      `I see your schedule. Busy ka pre. Kaya mo yan 💪`,
+      `I see your schedule, ${name}. Busy ka pre. Kaya mo yan 💪`,
     ] : [
-      "Uy, pumunta ka na dito! Mag-aral na tayo 📚",
-      "Bro is just staring at the screen 💀 sige na pre",
+      `Uy ${name}, pumunta ka na dito! Mag-aral na tayo 📚`,
+      `${name} is just staring at the screen 💀 sige na pre`,
       "Walang tasks? Perfect time mag-aral nang walang pressure 😌",
-      "Lodi, mag-add ka ng tasks sa calendar para di ka malimot 📅",
+      `Lodi ${name}, mag-add ka ng tasks sa calendar para di ka malimot 📅`,
       "Bet? Tara na, mag-aral tayo 🚀",
     ];
 
@@ -113,40 +118,54 @@ export default function NotebooksPage() {
 
       {/* Header */}
       <header className="relative border-b border-white/5 bg-gray-950/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <LanceBot mood="happy" size={30} animate={false} />
             <span className="font-bold text-white text-lg tracking-tight">LancePad</span>
           </div>
-          <Link href="/calendar" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 text-sm font-medium transition-all">
-            <Calendar size={15} />
-            Calendar
-          </Link>
+          <div className="flex items-center gap-2">
+            {username && (
+              <span className="pop-in hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 text-xs font-semibold">
+                @{username}
+              </span>
+            )}
+            <Link href="/calendar" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 text-sm font-medium transition-all">
+              <Calendar size={15} />
+              Calendar
+            </Link>
+            <button
+              onClick={() => signOut().then(() => router.push("/auth/login"))}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-950/30 text-sm font-medium transition-all"
+            >
+              <LogOut size={15} />
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="relative max-w-6xl mx-auto px-6 py-10">
+      <main className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* Hero */}
-        <div className="flex flex-col items-center text-center mb-10 bounce-in">
-          <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">{greeting}</h1>
+        <div className="flex flex-col items-center text-center mb-10 fade-slide-up">
+          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight">{greeting}</h1>
           <p className="text-gray-400 mt-2 text-base">Pick a notebook or start a new one.</p>
           <div className="relative mt-6 flex items-end justify-center">
             <LanceBot mood={todayTasks.filter(t => !t.completed).length > 0 ? "thinking" : "happy"} size={88} animate headsetPulse />
             {bubble && (
               <div
                 key={bubble}
-                className="absolute left-full ml-3 bottom-3 w-56 bg-gray-900 border border-purple-800/50 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-purple-100 leading-snug shadow-xl"
+                className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 sm:left-full sm:translate-x-0 sm:bottom-3 sm:ml-3 w-56 bg-gray-900 border border-purple-800/50 rounded-2xl px-4 py-2.5 text-sm text-purple-100 leading-snug shadow-xl"
                 style={{ animation: "bubble-in 0.3s ease-out" }}
               >
                 {bubble}
-                <div className="absolute -left-1.5 bottom-3 w-3 h-3 bg-gray-900 border-l border-b border-purple-800/50 rotate-45" />
+                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 sm:left-auto sm:translate-x-0 sm:-left-1.5 sm:bottom-3 w-3 h-3 bg-gray-900 border-r border-b sm:border-r-0 sm:border-l sm:border-b border-purple-800/50 rotate-45 sm:rotate-45" />
               </div>
             )}
           </div>
         </div>
 
         {/* Body: notebooks + sidebar */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 fade-slide-up" style={{ animationDelay: "120ms" }}>
 
           {/* Left: Notebooks */}
           <div>
