@@ -66,7 +66,7 @@ export default function NotebookCard({ notebook, onDelete }: NotebookCardProps) 
                 className="text-xs font-semibold px-3 py-1.5 rounded-full"
                 style={{ background: `${notebook.color}20`, color: notebook.color, border: `1px solid ${notebook.color}40` }}
               >
-                {notebook.card_count} cards
+                {notebook.card_count} {notebook.card_count === 1 ? "card" : "cards"}
               </span>
             ) : (
               <span className="text-xs text-gray-600 font-medium">No cards yet</span>

@@ -14,7 +14,8 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); exports=d.get\\('exports', {}\\); print\\(json.dumps\\({k: v for k, v in exports.items\\(\\) if 'google' in k.lower\\(\\) or 'provider' in k.lower\\(\\)}, indent=2\\)\\)\")",
       "Bash(npx convex *)",
       "Bash(python3 -c ' *)",
-      "Bash(npx patch-package *)"
+      "Bash(npx patch-package *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

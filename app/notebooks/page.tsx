@@ -51,7 +51,7 @@ export default function NotebooksPage() {
     `Ready to lock in${username ? `, ${username}` : ""}? 🔒`,
     `What are we cooking today${username ? `, ${username}` : ""}? 🍳`,
     `Back again${username ? `, ${username}` : ""}! Let's get it 🚀`,
-    `Your brain's about to level up 🧠`,
+    `Let's get that A 🤪`,
   ];
   const greeting = greetings[Math.floor(Date.now() / 86400000) % greetings.length];
 

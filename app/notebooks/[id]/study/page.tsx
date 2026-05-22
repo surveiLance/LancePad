@@ -238,8 +238,7 @@ export default function StudyPage() {
           )}
           <div className="flex gap-3 justify-center">
             <Button onClick={restartSession} variant="secondary"><RotateCcw size={15} />Try again</Button>
-            <Link href={`/notebooks/${notebookId}/quizzes`}><Button variant="secondary">Review quizzes</Button></Link>
-            <Link href={`/notebooks/${notebookId}/tutor`}><Button>Chat with LanceBot</Button></Link>
+            <Link href={`/notebooks/${notebookId}`}><Button>Back to notebook</Button></Link>
           </div>
         </div>
       </div>

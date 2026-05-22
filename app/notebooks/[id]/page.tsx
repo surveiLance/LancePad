@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, BookOpen, Save, Loader2, ClipboardList,
-  Send, RotateCcw, Zap, X,
+  Send, RotateCcw, Zap, X, Undo2,
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -16,6 +16,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
 import { setNoteContent as pushNoteContent } from "@/lib/lancebot-store";
 import { setGroqUsage } from "@/lib/groq-usage-store";
+import { markdownToTiptap } from "@/lib/markdown-to-tiptap";
 import type { ChatMessage } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,8 @@ export default function NotebookPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [botMood, setBotMood] = useState<"idle" | "happy" | "thinking" | "celebrate" | "sad">("happy");
   const [mobileTab, setMobileTab] = useState<"notes" | "chat">("notes");
+  const [pendingEditTiptap, setPendingEditTiptap] = useState<string | null>(null);
+  const [undoContent, setUndoContent] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
@@ -87,7 +90,7 @@ export default function NotebookPage() {
     } else {
       setMessages([{
         role: "assistant",
-        content: `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.`,
+        content: `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.\n\nOh, and if your notes are empty, just say **"start an outline for [topic]"** and I'll build one for you 🍳`,
       }]);
     }
   }, [savedMessages, notebook]);
@@ -141,6 +144,43 @@ export default function NotebookPage() {
     }
   }
 
+  function isEditIntent(msg: string): boolean {
+    const lower = msg.toLowerCase();
+    // Edit / modify existing notes
+    const noteRef = lower.includes("my notes") || lower.includes("the notes") || lower.includes("my note");
+    const editVerbs = ["edit", "fix", "clean", "organize", "rewrite", "update", "modify", "improve", "format", "restructure", "add", "remove", "delete", "expand", "shorten", "simplify", "convert", "revamp", "change"];
+    if (noteRef && editVerbs.some((v) => lower.includes(v))) return true;
+    // Create / start notes from scratch
+    const createVerbs = ["start", "create", "make", "generate", "write", "draft", "build", "give me"];
+    const targets = ["outline", "notes", "note", "study guide", "template", "structure", "summary"];
+    if (createVerbs.some((v) => lower.includes(v)) && targets.some((t) => lower.includes(t))) return true;
+    return false;
+  }
+
+  function handleApplyEdit(idx: number) {
+    if (!pendingEditTiptap) return;
+    setUndoContent(noteContent);
+    handleNoteChange(pendingEditTiptap);
+    handleSave(pendingEditTiptap);
+    setPendingEditTiptap(null);
+    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "undo_edit" } : m));
+  }
+
+  function handleRejectEdit(idx: number) {
+    setPendingEditTiptap(null);
+    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: undefined } : m));
+  }
+
+  function handleUndoEdit(idx: number) {
+    if (!undoContent) return;
+    const applied = noteContent;
+    handleNoteChange(undoContent);
+    handleSave(undoContent);
+    setPendingEditTiptap(applied);
+    setUndoContent(null);
+    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "pending_edit" } : m));
+  }
+
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
     if (!content || chatLoading) return;
@@ -152,6 +192,40 @@ export default function NotebookPage() {
     setMessages([...newMessages, { role: "assistant", content: "" }]);
 
     await addMessage({ notebookId, role: "user", content });
+
+    if (isEditIntent(content)) {
+      try {
+        const res = await fetch("/api/lancebot-edit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instruction: content, noteContent, notebookTitle: notebook?.title, username }),
+        });
+        const { message: botMsg, editedMarkdown } = await res.json();
+        setBotMood("happy");
+        // Type out word by word
+        const words = botMsg.split(" ");
+        await new Promise<void>((resolve) => {
+          let i = 0;
+          const tick = setInterval(() => {
+            i++;
+            setMessages([...newMessages, { role: "assistant", content: words.slice(0, i).join(" ") }]);
+            if (i >= words.length) { clearInterval(tick); resolve(); }
+          }, 55);
+        });
+        // Reveal action buttons only after typing finishes
+        if (editedMarkdown) {
+          setPendingEditTiptap(JSON.stringify(markdownToTiptap(editedMarkdown)));
+        }
+        setMessages([...newMessages, { role: "assistant", content: botMsg, action: editedMarkdown ? "pending_edit" : undefined }]);
+        await addMessage({ notebookId, role: "assistant", content: botMsg });
+      } catch {
+        setMessages([...newMessages, { role: "assistant", content: "Oof, couldn't edit that 😅 Try again?" }]);
+        setBotMood("sad");
+      } finally {
+        setChatLoading(false);
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/tutor", {
@@ -258,7 +332,7 @@ export default function NotebookPage() {
           )}
 
           <div className="flex-1 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col min-h-0">
-            <NoteEditor content={noteContent} onChange={handleNoteChange} />
+            <NoteEditor content={pendingEditTiptap ?? noteContent} onChange={pendingEditTiptap !== null ? () => {} : handleNoteChange} isPreview={pendingEditTiptap !== null} />
           </div>
 
           {/* LanceBot ambient presence */}
@@ -290,7 +364,7 @@ export default function NotebookPage() {
             <button
               onClick={async () => {
                 await clearMessages({ notebookId });
-                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?" }]);
+                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?\n\nBy the way — if you want me to kick things off, just say **\"start an outline for [topic]\"** and I'll build it for you 🍳" }]);
                 setBotMood("happy");
               }}
               className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
@@ -309,15 +383,44 @@ export default function NotebookPage() {
                     <LanceBot mood={i === messages.length - 1 ? botMood : "idle"} size={26} animate={false} />
                   </div>
                 )}
-                <div className={cn(
-                  "max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed",
-                  msg.role === "assistant"
-                    ? "bg-gray-900 border border-gray-800 text-gray-200"
-                    : "bg-purple-600 text-white",
-                )}>
-                  {msg.content
-                    ? <MarkdownText text={msg.content} />
-                    : <span className="text-gray-500 animate-pulse">...</span>}
+                <div className="flex flex-col gap-1.5 max-w-[82%]">
+                  <div className={cn(
+                    "rounded-2xl px-3 py-2 text-xs leading-relaxed",
+                    msg.role === "assistant"
+                      ? "bg-gray-900 border border-gray-800 text-gray-200"
+                      : "bg-purple-600 text-white",
+                  )}>
+                    {msg.content
+                      ? <MarkdownText text={msg.content} />
+                      : <span className="text-gray-500 animate-pulse">...</span>}
+                  </div>
+                  {msg.action === "pending_edit" && pendingEditTiptap !== null && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApplyEdit(i)}
+                        className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 bg-green-950/40 hover:bg-green-900/40 border border-green-800/50 px-2.5 py-1 rounded-full transition-colors"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Apply
+                      </button>
+                      <button
+                        onClick={() => handleRejectEdit(i)}
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1 rounded-full transition-colors"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        Discard
+                      </button>
+                    </div>
+                  )}
+                  {msg.action === "undo_edit" && undoContent !== null && (
+                    <button
+                      onClick={() => handleUndoEdit(i)}
+                      className="self-start flex items-center gap-1 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1 rounded-full transition-colors"
+                    >
+                      <Undo2 size={11} />
+                      Undo
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
