@@ -66,14 +66,30 @@ export const update = mutation({
     clearFolder: v.optional(v.boolean()),
   },
   handler: async (ctx, { id, title, emoji, notebookId, folderId, clearNotebook, clearFolder }) => {
-    const patch: Record<string, unknown> = {};
-    if (title !== undefined) patch.title = title;
-    if (emoji !== undefined) patch.emoji = emoji;
-    if (clearNotebook) patch.notebookId = undefined;
-    else if (notebookId !== undefined) patch.notebookId = notebookId;
-    if (clearFolder) patch.folderId = undefined;
-    else if (folderId !== undefined) patch.folderId = folderId;
-    await ctx.db.patch(id, patch);
+    const task = await ctx.db.get(id);
+    if (!task) return;
+    // Use replace so optional fields are genuinely removed (patch with undefined is unreliable)
+    const doc: {
+      userId?: typeof task.userId;
+      title: string;
+      date: string;
+      completed: boolean;
+      emoji?: string;
+      notebookId?: typeof notebookId;
+      folderId?: typeof folderId;
+    } = {
+      userId: task.userId,
+      title: title ?? task.title,
+      date: task.date,
+      completed: task.completed,
+    };
+    const resolvedEmoji = emoji ?? task.emoji;
+    if (resolvedEmoji) doc.emoji = resolvedEmoji;
+    const resolvedNotebook = clearNotebook ? undefined : (notebookId ?? task.notebookId);
+    if (resolvedNotebook) doc.notebookId = resolvedNotebook;
+    const resolvedFolder = clearFolder ? undefined : (folderId ?? task.folderId);
+    if (resolvedFolder) doc.folderId = resolvedFolder;
+    await ctx.db.replace(id, doc);
   },
 });
 
