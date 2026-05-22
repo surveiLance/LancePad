@@ -1,59 +1,51 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useConvexAuth } from "convex/react";
 import LanceBot from "@/components/LanceBot";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Zap, Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+function toEmail(username: string) {
+  return `${username.toLowerCase()}@lancepad.local`;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const justCreated = params.get("created") === "1";
   const { signIn } = useAuthActions();
-  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const { isAuthenticated } = useConvexAuth();
+
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
-
-  const isUsernameInput = emailOrUsername.length > 0 && !emailOrUsername.includes("@");
-  const resolvedEmail = useQuery(
-    api.userProfiles.getEmailByUsername,
-    isUsernameInput ? { username: emailOrUsername } : "skip"
-  );
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      let actualEmail = emailOrUsername;
-
-      if (isUsernameInput) {
-        if (!resolvedEmail) {
-          setError("No account found with that username.");
-          setLoading(false);
-          return;
-        }
-        actualEmail = resolvedEmail;
-      }
-
-      await signIn("password", { email: actualEmail, password, flow: "signIn" });
+      await signIn("password", { email: toEmail(username), password, flow: "signIn" });
+      await new Promise((r) => setTimeout(r, 500));
       router.push("/notebooks");
     } catch (err) {
-      const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      if (msg.includes("no account") || msg.includes("not found")) {
-        setError("No account found with that email.");
-      } else if (msg.includes("password") || msg.includes("incorrect")) {
-        setError("Wrong password. Try again.");
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("InvalidAccountId") || msg.includes("InvalidSecret")) {
+        setError("Wrong username or password.");
+      } else if (msg.includes("NoAuthProvider")) {
+        // Stale token in browser — sign out to clear it, then let user retry
+        await signIn("anonymous").catch(() => {});
+        setError("Session expired. Please try again.");
       } else {
-        setError("Invalid email/username or password.");
+        setError("Couldn't log in. Please try again.");
       }
       setLoading(false);
     }
@@ -63,6 +55,7 @@ export default function LoginPage() {
     setGuestLoading(true);
     try {
       await signIn("anonymous");
+      await new Promise((r) => setTimeout(r, 500));
       router.push("/notebooks");
     } catch {
       setError("Couldn't start guest session. Try again.");
@@ -92,16 +85,22 @@ export default function LoginPage() {
 
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-gray-800" />
-          <span className="text-gray-600 text-xs">or log in with email</span>
+          <span className="text-gray-600 text-xs">or log in</span>
           <div className="flex-1 h-px bg-gray-800" />
         </div>
+
+        {justCreated && (
+          <p className="text-green-400 text-sm bg-green-950/50 border border-green-900 rounded-lg px-3 py-2 mb-4 text-center">
+            Account created! Log in to continue.
+          </p>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <Input
             type="text"
-            placeholder="Email or username"
-            value={emailOrUsername}
-            onChange={(e) => setEmailOrUsername(e.target.value.trim())}
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.trim())}
             autoComplete="username"
           />
           <div className="relative">
@@ -121,11 +120,13 @@ export default function LoginPage() {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+
           {error && (
-            <p className="text-red-400 text-sm bg-red-950/50 border border-red-900 rounded-lg px-3 py-2 fade-in">
+            <p className="text-red-400 text-sm bg-red-950/50 border border-red-900 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
+
           <Button type="submit" size="lg" variant="secondary" className="w-full" disabled={loading}>
             {loading ? "Logging in..." : "Log in"}
           </Button>
@@ -139,5 +140,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

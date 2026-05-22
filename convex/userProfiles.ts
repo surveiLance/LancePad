@@ -16,6 +16,18 @@ export const create = mutation({
   },
 });
 
+export const getMe = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user?.email) return null;
+    // email is stored as username@lancepad.local — extract just the username part
+    return user.email.replace(/@lancepad\.local$/, "");
+  },
+});
+
 export const get = query({
   args: {},
   handler: async (ctx) => {

@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"npx convex dev\" --names \"next,convex\" --prefix-colors \"magenta,cyan\"",
+    "dev": "concurrently \"next dev -p 3001\" \"npx convex dev\" --names \"next,convex\" --prefix-colors \"magenta,cyan\"",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
@@ -32,6 +33,7 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "patch-package": "^8.0.1"
   }
 }

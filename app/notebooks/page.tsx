@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Calendar, Check, ChevronRight, LogOut } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NotebookCard from "@/components/NotebookCard";
 import CreateNotebookModal from "@/components/CreateNotebookModal";
 import LanceBot from "@/components/LanceBot";
-import LoadingScreen from "@/components/LoadingScreen";
 import Link from "next/link";
 
 function toDateStr(d: Date) {
@@ -28,8 +27,8 @@ export default function NotebooksPage() {
   const notebooks = notebooksQuery ?? [];
   const loading = notebooksQuery === undefined;
   const cardCounts = useQuery(api.cards.getCountsByNotebook) ?? {};
-  const profile = useQuery(api.userProfiles.get);
-  const username = profile?.username ?? null;
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const username = useQuery(api.userProfiles.getMe) ?? null;
   const createNotebook = useMutation(api.notebooks.create);
   const removeNotebook = useMutation(api.notebooks.remove);
   const toggleTask = useMutation(api.tasks.toggle);
@@ -48,42 +47,54 @@ export default function NotebooksPage() {
     return { date: d, str: toDateStr(d) };
   });
 
-  const name = username ? username : "Bro";
   const greetings = [
-    `Ready to lock in, ${name}? 🔒`,
-    `What are we cooking today, ${name}? 🍳`,
-    `Back again, ${name}! Let's get it 🚀`,
+    `Ready to lock in${username ? `, ${username}` : ""}? 🔒`,
+    `What are we cooking today${username ? `, ${username}` : ""}? 🍳`,
+    `Back again${username ? `, ${username}` : ""}! Let's get it 🚀`,
     `Your brain's about to level up 🧠`,
   ];
   const greeting = greetings[Math.floor(Date.now() / 86400000) % greetings.length];
 
   const [bubble, setBubble] = useState<string | null>(null);
+  const [welcomed, setWelcomed] = useState(false);
 
   useEffect(() => {
+    if (!welcomed && isAuthenticated && username) {
+      setBubble(`Welcome ${username}, tara aral na! 📚`);
+      setWelcomed(true);
+      return;
+    }
+
     const pending = todayTasks.filter((t) => !t.completed);
     const upcoming = upcomingTasks.filter((t) => t.date !== todayStr && !t.completed);
 
     const quips = pending.length > 0 ? [
-      `Uy ${name}! May ${pending.length} task ka pa ngayon. Sige na pre 👀`,
-      `${pending[0]?.title}? Di pa tapos yan, ${name}! Tara na 💪`,
+      `Uy! May ${pending.length} task ka pa ngayon. Sige na pre 👀`,
+      `${pending[0]?.title}? Di pa tapos yan! Tara na 💪`,
       `Huwag mong kalimutan yung tasks mo ngayon ha! 📅`,
     ] : upcoming.length > 0 ? [
-      `May ${upcoming.length} incoming tasks ka pa. Plan na, ${name}! 📅`,
+      `May ${upcoming.length} incoming tasks ka pa. Mag-aral na habang maaga 📅`,
       `Uy, may darating na tasks. Mag-aral na habang maaga 📚`,
-      `I see your schedule, ${name}. Busy ka pre. Kaya mo yan 💪`,
+      `I see your schedule. Busy ka pre. Kaya mo yan 💪`,
     ] : [
-      `Uy ${name}, pumunta ka na dito! Mag-aral na tayo 📚`,
-      `${name} is just staring at the screen 💀 sige na pre`,
+      `Uy, pumunta ka na dito! Mag-aral na tayo 📚`,
+      `Bro is just staring at the screen 💀 sige na pre`,
       "Walang tasks? Perfect time mag-aral nang walang pressure 😌",
-      `Lodi ${name}, mag-add ka ng tasks sa calendar para di ka malimot 📅`,
+      "Mag-add ka ng tasks sa calendar para di ka malimot 📅",
       "Bet? Tara na, mag-aral tayo 🚀",
     ];
 
     const show = () => setBubble(quips[Math.floor(Math.random() * quips.length)]);
-    const first = setTimeout(show, 2000);
+    const first = setTimeout(show, welcomed ? 2000 : 5000);
     const interval = setInterval(show, 15000);
     return () => { clearTimeout(first); clearInterval(interval); };
-  }, [todayTasks.length, upcomingTasks.length]);
+  }, [todayTasks.length, upcomingTasks.length, isAuthenticated, username, welcomed]);
+
+  if (authLoading) return null;
+  if (!isAuthenticated) {
+    router.replace("/auth/login");
+    return null;
+  }
 
   async function handleCreate(title: string, color: string, emoji: string) {
     const id = await createNotebook({ title, color, emoji });
@@ -108,8 +119,6 @@ export default function NotebooksPage() {
       .map(([str, tasks]) => ({ date: new Date(str + "T00:00:00"), str, tasks }));
   })();
 
-  if (loading) return <LoadingScreen />;
-
   return (
     <div className="min-h-screen bg-gray-950">
       <div className="fixed inset-0 pointer-events-none">
@@ -125,7 +134,7 @@ export default function NotebooksPage() {
           </div>
           <div className="flex items-center gap-2">
             {username && (
-              <span className="pop-in hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 text-xs font-semibold">
+              <span className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 text-xs font-semibold">
                 @{username}
               </span>
             )}

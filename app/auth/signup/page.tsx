@@ -1,26 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useConvexAuth } from "convex/react";
 import LanceBot from "@/components/LanceBot";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Zap, Eye, EyeOff } from "lucide-react";
 
-async function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+// Convex Password provider needs an email — we synthesize one from the username
+function toEmail(username: string) {
+  return `${username.toLowerCase()}@lancepad.local`;
 }
 
 export default function SignupPage() {
   const router = useRouter();
   const { signIn } = useAuthActions();
-  const createProfile = useMutation(api.userProfiles.create);
+  const { isAuthenticated } = useConvexAuth();
 
-  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -28,44 +27,32 @@ export default function SignupPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [slowHint, setSlowHint] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
+
+  useEffect(() => {
+    if (!loading) { setSlowHint(false); return; }
+    const t = setTimeout(() => setSlowHint(true), 7000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!username.trim()) { setError("Username is required."); return; }
     if (username.length < 3) { setError("Username must be at least 3 characters."); return; }
     if (password !== confirm) { setError("Passwords don't match."); return; }
     setLoading(true);
     try {
-      await signIn("password", { email, password, flow: "signUp" });
-
-      // Retry createProfile in case auth token hasn't propagated to Convex yet
-      let lastErr: unknown;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          await createProfile({ username: username.trim() });
-          router.push("/notebooks");
-          return;
-        } catch (err) {
-          lastErr = err;
-          const msg = err instanceof Error ? err.message.toLowerCase() : "";
-          if (msg.includes("not authenticated")) {
-            await delay(200 * (attempt + 1));
-            continue;
-          }
-          throw err;
-        }
-      }
-      throw lastErr;
+      await signIn("password", { email: toEmail(username), password, flow: "signUp" });
+      router.push("/auth/login?created=1");
     } catch (err) {
-      const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      if (msg.includes("already taken")) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("already") || msg.includes("exists")) {
         setError("That username is already taken. Try another.");
-      } else if (msg.includes("already") || msg.includes("exists")) {
-        setError("An account with this email already exists. Try logging in.");
-      } else if (msg.includes("password") || msg.includes("8")) {
-        setError("Password must be at least 8 characters.");
+      } else if (msg.includes("NoAuthProvider")) {
+        await signIn("anonymous").catch(() => {});
+        setError("Session expired. Please try again.");
       } else {
         setError("Couldn't create account. Please try again.");
       }
@@ -115,16 +102,11 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className="space-y-4">
           <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Input
             type="text"
             placeholder="Username (min 3 chars)"
             value={username}
             onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
+            autoComplete="username"
           />
 
           <div className="relative">
@@ -165,11 +147,18 @@ export default function SignupPage() {
           </div>
           {mismatch && <p className="text-red-400 text-xs -mt-2">Passwords don&apos;t match</p>}
 
+          {slowHint && (
+            <p className="text-yellow-500/80 text-xs text-center">
+              First signup takes a bit longer — almost there...
+            </p>
+          )}
+
           {error && (
             <p className="text-red-400 text-sm bg-red-950/50 border border-red-900 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
+
           <Button type="submit" size="lg" variant="secondary" className="w-full" disabled={loading || mismatch}>
             {loading ? "Creating account..." : "Create free account"}
           </Button>
