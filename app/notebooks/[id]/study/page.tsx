@@ -33,6 +33,7 @@ export default function StudyPage() {
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
   const allCards = useQuery(api.cards.getByNotebook, { notebookId });
+  const note = useQuery(api.notes.getByNotebook, { notebookId });
   const username = useQuery(api.userProfiles.getMe) ?? null;
   const quizSession = useQuery(
     api.quizSessions.get,
@@ -51,7 +52,6 @@ export default function StudyPage() {
   const [results, setResults] = useState<QuizResult[]>([]);
   const [botMood, setBotMood] = useState<"idle" | "happy" | "celebrate" | "sad" | "thinking">("idle");
   const [botMessage, setBotMessage] = useState("");
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [done, setDone] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summary, setSummary] = useState("");
@@ -59,7 +59,6 @@ export default function StudyPage() {
   const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Boom! ✨", "Nailed it! 🎯", "Clean! 💯", "Sige! 💪"];
   const WRONG   = ["Aww, not quite 😔", "That one's tricky!", "Review that one 👀", "Oops! 😅", "We'll get it next time 💪"];
   const PARTIAL = ["Almost there! 🤏", "Good effort! 💪", "Close! Keep it up ✨", "You got the gist!"];
-  const IDLE    = ["You got this! 💪", "Take your time 🤔", "Trust your notes! 📝", "What do you think?", "Breathe. You studied for this 😌"];
 
   function pick(arr: string[]) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -68,13 +67,11 @@ export default function StudyPage() {
     setBotMessage(message);
   }
 
-  // After moving to a new card, show an idle nudge after a short pause
+  // Clear bot message when moving to a new card
   useEffect(() => {
-    if (done || cardState !== "question") return;
+    if (done) return;
     setBotMessage("");
     setBotMood("idle");
-    idleTimerRef.current = setTimeout(() => setBotMessage(pick(IDLE)), 1800);
-    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, done]);
 
@@ -100,19 +97,38 @@ export default function StudyPage() {
 
   const card = cards[current];
 
+  async function explainWrongAnswer(question: string, correctAnswer: string, userAnswer: string) {
+    setBotMood("thinking");
+    setBotMessage("");
+    try {
+      const res = await fetch("/api/lancebot-explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, correctAnswer, userAnswer, notebookTitle: notebook?.title, noteContent: note?.content ?? "", username }),
+      });
+      const { explanation } = await res.json();
+      setBotMood("sad");
+      setBotMessage(explanation);
+    } catch {
+      setBotComment("sad", pick(WRONG));
+    }
+  }
+
   function handleMultipleChoice(option: string) {
     if (cardState !== "question" || !card) return;
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setSelected(option);
     setCardState("answered");
     const isCorrect = option === card.answer;
     recordResult(isCorrect, option);
-    setBotComment(isCorrect ? "celebrate" : "sad", pick(isCorrect ? CORRECT : WRONG));
+    if (isCorrect) {
+      setBotComment("celebrate", pick(CORRECT));
+    } else {
+      explainWrongAnswer(card.question, card.answer, option);
+    }
   }
 
   async function handleShortAnswer() {
     if (!shortAnswer.trim() || grading || !card) return;
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setGrading(true);
     setCardState("answered");
     setBotComment("thinking", "Checking your answer... 🤔");
@@ -127,18 +143,24 @@ export default function StudyPage() {
     setGrading(false);
     const isCorrect = grade.correct || (grade.partial && grade.score >= 70);
     recordResult(isCorrect, shortAnswer);
-    setBotComment(
-      grade.correct ? "celebrate" : grade.partial ? "happy" : "sad",
-      pick(grade.correct ? CORRECT : grade.partial ? PARTIAL : WRONG),
-    );
+    if (grade.correct) {
+      setBotComment("celebrate", pick(CORRECT));
+    } else if (grade.partial) {
+      setBotComment("happy", pick(PARTIAL));
+    } else {
+      explainWrongAnswer(card.question, card.answer, shortAnswer);
+    }
   }
 
   function handleRevealFlashcard(isCorrect: boolean) {
     if (!card) return;
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setCardState("revealed");
     recordResult(isCorrect, isCorrect ? card.answer : "incorrect");
-    setBotComment(isCorrect ? "celebrate" : "sad", pick(isCorrect ? CORRECT : WRONG));
+    if (isCorrect) {
+      setBotComment("celebrate", pick(CORRECT));
+    } else {
+      explainWrongAnswer(card.question, card.answer, "marked as missed");
+    }
   }
 
   function recordResult(isCorrect: boolean, userAnswer: string) {
@@ -365,12 +387,12 @@ export default function StudyPage() {
         {botMessage && (
           <div
             key={botMessage}
-            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-200 max-w-[180px] leading-relaxed shadow-lg bounce-in"
+            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-200 w-[580px] max-w-[calc(100vw-6rem)] leading-relaxed shadow-lg bounce-in"
           >
             {botMessage}
           </div>
         )}
-        <LanceBot mood={botMood} size={52} animate={botMood === "thinking" || botMood === "idle"} />
+        <LanceBot mood={botMood} size={72} animate />
       </div>
     </div>
   );
