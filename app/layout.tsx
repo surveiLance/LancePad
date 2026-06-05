@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import FloatingLanceBot from "@/components/FloatingLanceBot";
+import PomodoroTimer from "@/components/PomodoroTimer";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ConvexClientProvider>
             {children}
             <FloatingLanceBot />
+            <PomodoroTimer />
           </ConvexClientProvider>
         </body>
       </html>

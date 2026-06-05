@@ -12,8 +12,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NoteEditor from "@/components/NoteEditor";
 import PasteImportModal from "@/components/PasteImportModal";
-import PomodoroTimer from "@/components/PomodoroTimer";
 import SummaryModal from "@/components/SummaryModal";
+import PomodoroTimer from "@/components/PomodoroTimer";
 import { downloadMarkdown, printNotes } from "@/lib/export-notes";
 import LanceBot from "@/components/LanceBot";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -340,7 +340,7 @@ export default function NotebookPage() {
                 </>
               )}
             </div>
-            <PomodoroTimer />
+            <PomodoroTimer variant="header" />
           </div>
         </div>
       </header>
