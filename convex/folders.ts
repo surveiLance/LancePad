@@ -34,6 +34,17 @@ export const rename = mutation({
   },
 });
 
+export const update = mutation({
+  args: { id: v.id("folders"), name: v.string(), color: v.string(), emoji: v.string() },
+  handler: async (ctx, { id, name, color, emoji }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const folder = await ctx.db.get(id);
+    if (!folder || folder.userId !== userId) throw new Error("Not found");
+    await ctx.db.patch(id, { name, color, emoji });
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("folders") },
   handler: async (ctx, { id }) => {

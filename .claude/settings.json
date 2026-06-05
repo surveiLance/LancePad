@@ -15,7 +15,8 @@
       "Bash(npx convex *)",
       "Bash(python3 -c ' *)",
       "Bash(npx patch-package *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const p = require\\('pdfjs-dist/package.json'\\); console.log\\(p.version\\)\")"
     ]
   }
 }

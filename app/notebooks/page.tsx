@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Calendar, Check, ChevronRight, LogOut, FolderPlus, ChevronDown, Trash2 } from "lucide-react";
+import { Plus, Calendar, Check, ChevronRight, LogOut, FolderPlus, ChevronDown, Trash2, Pencil } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -11,6 +11,7 @@ import NotebookCard from "@/components/NotebookCard";
 import CreateNotebookModal from "@/components/CreateNotebookModal";
 import CreateFolderModal from "@/components/CreateFolderModal";
 import EditNotebookModal from "@/components/EditNotebookModal";
+import EditFolderModal from "@/components/EditFolderModal";
 import LanceBot from "@/components/LanceBot";
 import Link from "next/link";
 
@@ -36,6 +37,7 @@ export default function NotebooksPage() {
   const removeNotebook = useMutation(api.notebooks.remove);
   const updateNotebook = useMutation(api.notebooks.update);
   const createFolder = useMutation(api.folders.create);
+  const updateFolder = useMutation(api.folders.update);
   const removeFolder = useMutation(api.folders.remove);
   const setNotebookFolder = useMutation(api.notebooks.setFolder);
   const toggleTask = useMutation(api.tasks.toggle);
@@ -44,6 +46,7 @@ export default function NotebooksPage() {
   const [defaultFolderId, setDefaultFolderId] = useState<Id<"folders"> | undefined>(undefined);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   const [editingNotebook, setEditingNotebook] = useState<{ id: string; title: string; color: string; emoji: string } | null>(null);
+  const [editingFolder, setEditingFolder] = useState<{ id: string; name: string; color: string; emoji: string } | null>(null);
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
 
   const now = new Date();
@@ -146,6 +149,10 @@ export default function NotebooksPage() {
 
   async function handleSaveEdit(id: string, title: string, color: string, emoji: string) {
     await updateNotebook({ id: id as Id<"notebooks">, title, color, emoji });
+  }
+
+  async function handleSaveFolderEdit(id: string, name: string, color: string, emoji: string) {
+    await updateFolder({ id: id as Id<"folders">, name, color, emoji });
   }
 
   // Group all upcoming tasks by date, excluding today, hide completed
@@ -277,6 +284,9 @@ export default function NotebooksPage() {
                         </button>
                         <button onClick={() => openCreateInFolder(folder._id)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 transition-all p-1 rounded-lg hover:bg-gray-800" title="Add notebook">
                           <Plus size={14} />
+                        </button>
+                        <button onClick={() => setEditingFolder({ id: folder._id, name: folder.name, color: folder.color, emoji: folder.emoji })} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 transition-all p-1 rounded-lg hover:bg-gray-800" title="Edit folder">
+                          <Pencil size={13} />
                         </button>
                         <button onClick={() => handleDeleteFolder(folder._id)} className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-1 rounded-lg hover:bg-gray-800" title="Delete folder">
                           <Trash2 size={13} />
@@ -540,6 +550,13 @@ export default function NotebooksPage() {
           notebook={editingNotebook}
           onClose={() => setEditingNotebook(null)}
           onSave={handleSaveEdit}
+        />
+      )}
+      {editingFolder && (
+        <EditFolderModal
+          folder={editingFolder}
+          onClose={() => setEditingFolder(null)}
+          onSave={handleSaveFolderEdit}
         />
       )}
     </div>

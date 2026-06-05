@@ -5,12 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, BookOpen, Save, Loader2, ClipboardList,
-  Send, RotateCcw, Zap, X, Undo2,
+  Send, RotateCcw, Zap, X, Undo2, FileUp,
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NoteEditor from "@/components/NoteEditor";
+import PasteImportModal from "@/components/PasteImportModal";
 import LanceBot from "@/components/LanceBot";
 import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
@@ -61,11 +62,25 @@ export default function NotebookPage() {
   const [mobileTab, setMobileTab] = useState<"notes" | "chat">("notes");
   const [pendingEditTiptap, setPendingEditTiptap] = useState<string | null>(null);
   const [undoContent, setUndoContent] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
     setNoteContent(content);
     pushNoteContent(content);
+  }
+
+  function handleImportInsert(newTiptapJson: string) {
+    try {
+      const existing = noteContent ? JSON.parse(noteContent) : { type: "doc", content: [] };
+      const incoming = JSON.parse(newTiptapJson);
+      const merged = JSON.stringify({ type: "doc", content: [...(existing.content ?? []), ...(incoming.content ?? [])] });
+      handleNoteChange(merged);
+      handleSave(merged);
+    } catch {
+      handleNoteChange(newTiptapJson);
+      handleSave(newTiptapJson);
+    }
   }
 
   const noteLoaded = useRef(false);
@@ -305,7 +320,14 @@ export default function NotebookPage() {
 
         {/* Left — Notes */}
         <div className={cn("flex-1 flex-col min-h-0 border-r border-gray-800/60 p-4 gap-3 relative", "md:flex", mobileTab === "notes" ? "flex" : "hidden")}>
-          <div className="flex-shrink-0 grid grid-cols-2 gap-2">
+          <div className="flex-shrink-0 grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 font-semibold text-sm transition-all hover:-translate-y-0.5"
+            >
+              <FileUp size={14} className="text-blue-400" />
+              Import
+            </button>
             <Link
               href={`/notebooks/${notebookId}/cards`}
               className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-semibold text-sm transition-all hover:-translate-y-0.5"
@@ -467,6 +489,15 @@ export default function NotebookPage() {
           </div>
         </div>
       </div>
+
+      {showImport && (
+        <PasteImportModal
+          notebookTitle={notebook.title}
+          username={username}
+          onClose={() => setShowImport(false)}
+          onInsert={handleImportInsert}
+        />
+      )}
 
       {/* Quiz modal */}
       {showQuizPicker && (
