@@ -3,8 +3,10 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
+import Highlight from "@tiptap/extension-highlight";
 import { useEffect, useRef } from "react";
-import { Bold, Italic, List, ListOrdered, Heading2, Quote, Minus, Undo2, Redo2 } from "lucide-react";
+import { Bold, Italic, List, ListOrdered, Heading2, Quote, Minus, Undo2, Redo2, Highlighter, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NoteEditorProps {
@@ -41,9 +43,19 @@ function ToolbarBtn({
   );
 }
 
+function imageToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function NoteEditor({ content, onChange, isPreview = false }: NoteEditorProps) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -51,14 +63,34 @@ export default function NoteEditor({ content, onChange, isPreview = false }: Not
       Placeholder.configure({
         placeholder: "Start typing your notes here... paste your syllabus, copy from your textbook, jot down key points — Lance will handle the rest 🧠",
       }),
+      Image.configure({ inline: false, allowBase64: true }),
+      Highlight.configure({ multicolor: false }),
     ],
     content: content ? JSON.parse(content) : "",
     onUpdate({ editor }) {
       onChangeRef.current(JSON.stringify(editor.getJSON()));
     },
     editorProps: {
-      attributes: {
-        class: "tiptap-editor",
+      attributes: { class: "tiptap-editor" },
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            imageToBase64(file).then((src) => {
+              view.dispatch(
+                view.state.tr.replaceSelectionWith(
+                  view.state.schema.nodes.image.create({ src })
+                )
+              );
+            });
+            return true;
+          }
+        }
+        return false;
       },
     },
   });
@@ -73,12 +105,18 @@ export default function NoteEditor({ content, onChange, isPreview = false }: Not
     }
   }, [content, editor]);
 
+  async function handleImageFile(file: File) {
+    if (!editor) return;
+    const src = await imageToBase64(file);
+    editor.chain().focus().setImage({ src }).run();
+  }
+
   if (!editor) return null;
 
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-3 py-2 border-b border-gray-800 bg-gray-950">
+      <div className="flex items-center gap-0.5 px-3 py-2 border-b border-gray-800 bg-gray-950 flex-wrap">
         <ToolbarBtn title="Undo" onClick={() => editor.chain().focus().undo().run()} active={false}>
           <Undo2 size={15} />
         </ToolbarBtn>
@@ -108,12 +146,28 @@ export default function NoteEditor({ content, onChange, isPreview = false }: Not
         <ToolbarBtn title="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false}>
           <Minus size={15} />
         </ToolbarBtn>
+        <div className="w-px h-4 bg-gray-800 mx-1" />
+        <ToolbarBtn title="Highlight" onClick={() => editor.chain().focus().toggleHighlight().run()} active={editor.isActive("highlight")}>
+          <Highlighter size={15} />
+        </ToolbarBtn>
+        <ToolbarBtn title="Insert image" onClick={() => fileInputRef.current?.click()} active={false}>
+          <ImageIcon size={15} />
+        </ToolbarBtn>
         {isPreview && (
           <span className="ml-auto text-xs text-purple-400 font-medium px-2 py-0.5 rounded-full bg-purple-950/50 border border-purple-800/50">
             preview
           </span>
         )}
       </div>
+
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ""; }}
+      />
 
       {/* Editor */}
       <div className={cn("flex-1 overflow-y-auto px-5 py-4 transition-opacity duration-300", isPreview ? "opacity-40 pointer-events-none select-none" : "opacity-100")}>

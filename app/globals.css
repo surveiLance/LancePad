@@ -45,6 +45,17 @@ body {
 .tiptap-editor .ProseMirror code {
   @apply bg-gray-800 rounded px-1.5 py-0.5 text-sm font-mono text-purple-300;
 }
+.tiptap-editor .ProseMirror mark {
+  background-color: #fde047;
+  color: #1a1a1a;
+  border-radius: 3px;
+  padding: 1px 2px;
+}
+.tiptap-editor .ProseMirror img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0;
+}
 
 /* Animations */
 @keyframes float {

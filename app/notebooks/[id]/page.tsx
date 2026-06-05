@@ -5,13 +5,16 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, BookOpen, Save, Loader2, ClipboardList,
-  Send, RotateCcw, Zap, X, Undo2, FileUp,
+  Send, RotateCcw, Zap, X, Undo2, FileUp, Download, FileText, Printer, Sparkles,
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NoteEditor from "@/components/NoteEditor";
 import PasteImportModal from "@/components/PasteImportModal";
+import PomodoroTimer from "@/components/PomodoroTimer";
+import SummaryModal from "@/components/SummaryModal";
+import { downloadMarkdown, printNotes } from "@/lib/export-notes";
 import LanceBot from "@/components/LanceBot";
 import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
@@ -63,6 +66,8 @@ export default function NotebookPage() {
   const [pendingEditTiptap, setPendingEditTiptap] = useState<string | null>(null);
   const [undoContent, setUndoContent] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
@@ -292,9 +297,50 @@ export default function NotebookPage() {
           <span className="text-white font-semibold truncate flex-1 text-sm">
             {notebook.emoji} {notebook.title}
           </span>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            {saving ? <><Loader2 size={11} className="animate-spin" /> Saving...</> :
-             saved  ? <><Save size={11} className="text-green-400" /> Saved</>   : null}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 mr-1">
+              {saving ? <><Loader2 size={11} className="animate-spin" /> Saving...</> :
+               saved  ? <><Save size={11} className="text-green-400" /> Saved</>   : null}
+            </div>
+            <button
+              onClick={() => setShowSummary(true)}
+              disabled={noteContent.length < 10}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Sparkles size={13} className="text-yellow-400" />
+              Summary
+            </button>
+            <div className="relative hidden sm:block">
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-white text-xs font-semibold transition-all"
+              >
+                <Download size={13} />
+                Export
+              </button>
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-44 overflow-hidden bounce-in">
+                    <button
+                      onClick={() => { downloadMarkdown(notebook.title, noteContent); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                    >
+                      <FileText size={14} className="text-blue-400" />
+                      Download .md
+                    </button>
+                    <button
+                      onClick={() => { printNotes(notebook.title, noteContent); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                    >
+                      <Printer size={14} className="text-green-400" />
+                      Print / Save PDF
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <PomodoroTimer />
           </div>
         </div>
       </header>
@@ -496,6 +542,14 @@ export default function NotebookPage() {
           username={username}
           onClose={() => setShowImport(false)}
           onInsert={handleImportInsert}
+        />
+      )}
+      {showSummary && (
+        <SummaryModal
+          notebookTitle={notebook.title}
+          noteContent={noteContent}
+          username={username}
+          onClose={() => setShowSummary(false)}
         />
       )}
 
