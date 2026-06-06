@@ -43,6 +43,7 @@ export default function StudyPage() {
   const completeSession = useMutation(api.quizSessions.complete);
 
   const [cards, setCards] = useState<StudyCard[]>([]);
+  const [originalCards, setOriginalCards] = useState<StudyCard[]>([]);
   const [current, setCurrent] = useState(0);
   const [cardState, setCardState] = useState<CardState>("question");
   const [selected, setSelected] = useState("");
@@ -78,16 +79,20 @@ export default function StudyPage() {
   // Load cards from either quiz session or flashcard library
   useEffect(() => {
     if (sessionId && quizSession) {
-      setCards(quizSession.questions.map((q, i) => ({
+      const loaded = quizSession.questions.map((q, i) => ({
         _id: `q-${i}`,
         question: q.question,
         answer: q.answer,
         type: q.type,
         options: q.options,
         isQuiz: true,
-      })));
+      }));
+      setCards(loaded);
+      setOriginalCards(loaded);
     } else if (!sessionId && allCards && allCards.length > 0) {
-      setCards(allCards.map((c) => ({ ...c, _id: c._id, isQuiz: false })));
+      const loaded = allCards.map((c) => ({ ...c, _id: c._id, isQuiz: false }));
+      setCards(loaded);
+      setOriginalCards(loaded);
     }
   }, [sessionId, quizSession, allCards]);
 
@@ -133,12 +138,17 @@ export default function StudyPage() {
     setCardState("answered");
     setBotComment("thinking", "Checking your answer... 🤔");
 
-    const res = await fetch("/api/grade-answer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: card.question, modelAnswer: card.answer, userAnswer: shortAnswer, notebookTitle: notebook?.title, username }),
-    });
-    const grade = await res.json();
+    let grade = { correct: false, partial: false, score: 0, feedback: "Hmm, trouble grading that — keep going! 🤖" };
+    try {
+      const res = await fetch("/api/grade-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: card.question, modelAnswer: card.answer, userAnswer: shortAnswer, notebookTitle: notebook?.title, username }),
+      });
+      grade = await res.json();
+    } catch {
+      // fall through with default grade
+    }
     setGradeFeedback(grade);
     setGrading(false);
     const isCorrect = grade.correct || (grade.partial && grade.score >= 70);
@@ -188,13 +198,17 @@ export default function StudyPage() {
       });
     }
 
-    const res = await fetch("/api/session-summary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ results: finalResults, notebookTitle: notebook?.title, username }),
-    });
-    const { summary: s } = await res.json();
-    setSummary(s);
+    try {
+      const res = await fetch("/api/session-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ results: finalResults, notebookTitle: notebook?.title, username }),
+      });
+      const { summary: s } = await res.json();
+      setSummary(s);
+    } catch {
+      setSummary("Great session! Keep reviewing what you missed and you'll get it next time. 💪");
+    }
     setLoadingSummary(false);
   }, [sessionId, completeSession, notebook?.title]);
 
@@ -213,6 +227,25 @@ export default function StudyPage() {
   }
 
   function restartSession() {
+    setCards(originalCards);
+    setCurrent(0);
+    setCardState("question");
+    setSelected("");
+    setShortAnswer("");
+    setGradeFeedback(null);
+    setResults([]);
+    setBotMood("idle");
+    setBotMessage("");
+    setDone(false);
+    setSummary("");
+  }
+
+  function retryWrongAnswers() {
+    const wrongCards = results
+      .filter((r) => r.result === "incorrect")
+      .map((r) => cards[r.questionIndex])
+      .filter(Boolean) as StudyCard[];
+    setCards(wrongCards);
     setCurrent(0);
     setCardState("question");
     setSelected("");
@@ -247,7 +280,15 @@ export default function StudyPage() {
           </div>
           {results.filter((r) => r.result === "incorrect").length > 0 && (
             <div className="bg-red-950/30 border border-red-900/50 rounded-2xl p-4 text-left mb-6">
-              <p className="text-xs text-red-400 font-semibold uppercase tracking-wider mb-2">Review these 👀</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-red-400 font-semibold uppercase tracking-wider">Review these 👀</p>
+                <button
+                  onClick={retryWrongAnswers}
+                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold border border-purple-800 hover:border-purple-600 rounded-lg px-2.5 py-1 transition-colors"
+                >
+                  Quiz me on these →
+                </button>
+              </div>
               <ul className="space-y-1">
                 {results.filter((r) => r.result === "incorrect").map((r, i) => (
                   <li key={i} className="text-gray-400 text-sm flex items-start gap-2">
@@ -387,7 +428,7 @@ export default function StudyPage() {
         {botMessage && (
           <div
             key={botMessage}
-            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-200 w-[580px] max-w-[calc(100vw-6rem)] leading-relaxed shadow-lg bounce-in"
+            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 text-base text-gray-200 w-[580px] max-w-[calc(100vw-6rem)] leading-relaxed shadow-lg bounce-in"
           >
             {botMessage}
           </div>

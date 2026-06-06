@@ -192,7 +192,7 @@ export default function NotebooksPage() {
               Calendar
             </Link>
             <button
-              onClick={() => signOut().then(() => router.push("/auth/login"))}
+              onClick={() => signOut().then(() => { window.location.href = "/auth/login"; })}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-950/30 text-sm font-medium transition-all"
             >
               <LogOut size={15} />

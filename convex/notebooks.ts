@@ -6,9 +6,10 @@ export const list = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
     return ctx.db
       .query("notebooks")
-      .withIndex("by_user", (q) => q.eq("userId", userId ?? undefined))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
   },

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = `${buildHelpSystemPrompt(username)}
 
 You are reacting to a wrong answer during a quiz on "${notebookTitle}".
-1-2 sentences only. State the correct answer and the key reason why in LanceBot's voice. No fluff.
+1 sentence max. Give the correct answer and the single key reason why. Be direct, no filler.
 
 ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
 
@@ -37,7 +37,7 @@ ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
       { role: "user", content: `Question: ${question}\nCorrect answer: ${correctAnswer}\nStudent answered: ${userAnswer}` },
     ],
     temperature: 0.6,
-    max_tokens: 100,
+    max_tokens: 60,
   });
 
   return NextResponse.json({

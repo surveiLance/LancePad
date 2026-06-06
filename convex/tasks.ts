@@ -6,9 +6,10 @@ export const getByDate = query({
   args: { date: v.string() },
   handler: async (ctx, { date }) => {
     const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
     const all = await ctx.db
       .query("tasks")
-      .withIndex("by_user", (q) => q.eq("userId", userId ?? undefined))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     return all.filter((t) => t.date === date);
   },
@@ -18,9 +19,10 @@ export const getUpcoming = query({
   args: { from: v.string(), days: v.number() },
   handler: async (ctx, { from, days }) => {
     const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
     const all = await ctx.db
       .query("tasks")
-      .withIndex("by_user", (q) => q.eq("userId", userId ?? undefined))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     const fromDate = new Date(from);
     const toDate = new Date(from);

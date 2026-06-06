@@ -34,8 +34,7 @@ function LoginForm() {
     setLoading(true);
     try {
       await signIn("password", { email: toEmail(username), password, flow: "signIn" });
-      await new Promise((r) => setTimeout(r, 500));
-      router.push("/notebooks");
+      window.location.href = "/notebooks";
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("InvalidAccountId") || msg.includes("InvalidSecret")) {
@@ -55,8 +54,7 @@ function LoginForm() {
     setGuestLoading(true);
     try {
       await signIn("anonymous");
-      await new Promise((r) => setTimeout(r, 500));
-      router.push("/notebooks");
+      window.location.href = "/notebooks";
     } catch {
       setError("Couldn't start guest session. Try again.");
       setGuestLoading(false);
