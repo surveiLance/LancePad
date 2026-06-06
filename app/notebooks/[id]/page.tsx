@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft, BookOpen, Save, Loader2, ClipboardList,
   Send, RotateCcw, Zap, X, Undo2, FileUp, Download, FileText, Printer, Sparkles,
+  CheckCircle2, Circle, Plus, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -46,9 +47,12 @@ export default function NotebookPage() {
   const note = useQuery(api.notes.getByNotebook, { notebookId });
   const savedMessages = useQuery(api.tutorMessages.getByNotebook, { notebookId });
   const username = useQuery(api.userProfiles.getMe) ?? null;
+  const notebookTasks = useQuery(api.tasks.getByNotebook, { notebookId }) ?? [];
   const saveNote = useMutation(api.notes.save);
   const addMessage = useMutation(api.tutorMessages.add);
   const clearMessages = useMutation(api.tutorMessages.clear);
+  const createTask = useMutation(api.tasks.create);
+  const toggleTask = useMutation(api.tasks.toggle);
 
   const [noteContent, setNoteContent] = useState("");
   const [saving, setSaving] = useState(false);
@@ -68,6 +72,8 @@ export default function NotebookPage() {
   const [showImport, setShowImport] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(true);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
@@ -389,6 +395,62 @@ export default function NotebookPage() {
               {generating ? <Loader2 size={14} className="animate-spin" /> : <BookOpen size={14} />}
               Quiz
             </button>
+          </div>
+
+          {/* Tasks for this notebook */}
+          <div className="flex-shrink-0 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setTasksOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-800/50 transition-colors"
+            >
+              <span className="text-xs font-semibold text-gray-400 flex items-center gap-2">
+                <CheckCircle2 size={13} className="text-purple-400" />
+                Tasks
+                {notebookTasks.length > 0 && (
+                  <span className="text-gray-600">
+                    {notebookTasks.filter((t) => t.completed).length}/{notebookTasks.length}
+                  </span>
+                )}
+              </span>
+              {tasksOpen ? <ChevronDown size={13} className="text-gray-600" /> : <ChevronRight size={13} className="text-gray-600" />}
+            </button>
+            {tasksOpen && (
+              <div className="border-t border-gray-800 px-3 py-2 space-y-1">
+                {notebookTasks.map((task) => (
+                  <div key={task._id} className="flex items-center gap-2 py-1 group">
+                    <button onClick={() => toggleTask({ id: task._id })} className="flex-shrink-0 text-gray-500 hover:text-purple-400 transition-colors">
+                      {task.completed
+                        ? <CheckCircle2 size={15} className="text-purple-500" />
+                        : <Circle size={15} />}
+                    </button>
+                    <span className={cn("text-sm flex-1 leading-snug", task.completed && "line-through text-gray-600")}>
+                      {task.title}
+                    </span>
+                    <span className="text-[10px] text-gray-700 group-hover:text-gray-500">{task.date}</span>
+                  </div>
+                ))}
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const title = newTaskTitle.trim();
+                    if (!title) return;
+                    const today = new Date();
+                    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+                    await createTask({ title, date, notebookId });
+                    setNewTaskTitle("");
+                  }}
+                  className="flex items-center gap-2 pt-1"
+                >
+                  <Plus size={13} className="text-gray-600 flex-shrink-0" />
+                  <input
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    placeholder="Add task..."
+                    className="flex-1 bg-transparent text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:placeholder-gray-600"
+                  />
+                </form>
+              </div>
+            )}
           </div>
 
           {quizError && (

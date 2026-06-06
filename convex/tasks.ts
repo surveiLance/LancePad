@@ -34,6 +34,18 @@ export const getUpcoming = query({
   },
 });
 
+export const getByNotebook = query({
+  args: { notebookId: v.id("notebooks") },
+  handler: async (ctx, { notebookId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return ctx.db
+      .query("tasks")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+      .collect();
+  },
+});
+
 export const create = mutation({
   args: {
     title: v.string(),

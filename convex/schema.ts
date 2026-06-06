@@ -52,7 +52,7 @@ export default defineSchema({
     folderId: v.optional(v.id("folders")),
     completed: v.boolean(),
     emoji: v.optional(v.string()),
-  }).index("by_date", ["date"]).index("by_user", ["userId"]),
+  }).index("by_date", ["date"]).index("by_user", ["userId"]).index("by_notebook", ["notebookId"]),
 
   quizSessions: defineTable({
     notebookId: v.id("notebooks"),
