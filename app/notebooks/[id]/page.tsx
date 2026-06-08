@@ -15,7 +15,7 @@ import NoteEditor from "@/components/NoteEditor";
 import PasteImportModal from "@/components/PasteImportModal";
 import SummaryModal from "@/components/SummaryModal";
 import PomodoroTimer from "@/components/PomodoroTimer";
-import { downloadMarkdown, printNotes } from "@/lib/export-notes";
+import { downloadMarkdown, printNotes, downloadDocx } from "@/lib/export-notes";
 import LanceBot from "@/components/LanceBot";
 import LoadingScreen from "@/components/LoadingScreen";
 import Button from "@/components/ui/Button";
@@ -83,6 +83,12 @@ export default function NotebookPage() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [outlineTopic, setOutlineTopic] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  function parseChoices(text: string): string[] | null {
+    const matches = [...text.matchAll(/\b([A-D])\)\s*([^\n\[A-D]+?)(?=\s+[A-D]\)|$)/g)];
+    if (matches.length < 2) return null;
+    return matches.map((m) => `${m[1]}) ${m[2].trim()}`);
+  }
 
   function handleNoteChange(content: string) {
     setNoteContent(content);
@@ -364,6 +370,13 @@ export default function NotebookPage() {
                       Download .md
                     </button>
                     <button
+                      onClick={() => { downloadDocx(notebook.title, noteContent); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                    >
+                      <FileText size={14} className="text-indigo-400" />
+                      Download .docx
+                    </button>
+                    <button
                       onClick={() => { printNotes(notebook.title, noteContent); setShowExportMenu(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
                     >
@@ -517,7 +530,7 @@ export default function NotebookPage() {
                 e.preventDefault();
                 if (!outlineTopic.trim() || chatLoading) return;
                 const msg = notebook.type === "assignment"
-                  ? `Here are my assignment requirements:\n\n${outlineTopic.trim()}\n\nAnalyze these requirements and create a structured assignment template with clearly labeled sections I need to fill in.`
+                  ? `Here are my assignment requirements:\n\n${outlineTopic.trim()}\n\nAsk me your first question. No intro — just the question.`
                   : `Start an outline for ${outlineTopic.trim()}`;
                 sendMessage(msg);
                 setOutlineTopic("");
@@ -627,6 +640,23 @@ export default function NotebookPage() {
                       Undo
                     </button>
                   )}
+                  {msg.role === "assistant" && i === messages.length - 1 && !chatLoading && notebook?.type === "assignment" && (() => {
+                    const choices = parseChoices(msg.content);
+                    if (!choices) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {choices.map((choice) => (
+                          <button
+                            key={choice}
+                            onClick={() => sendMessage(choice)}
+                            className="text-xs text-purple-300 bg-purple-950/50 border border-purple-800/60 hover:bg-purple-900/50 hover:border-purple-700 px-2.5 py-1 rounded-full transition-colors"
+                          >
+                            {choice}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

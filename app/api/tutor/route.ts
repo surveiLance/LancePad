@@ -40,9 +40,10 @@ export async function POST(req: NextRequest) {
   }));
 
   const { data: stream, response: groqResponse } = await groq.chat.completions.create({
-    model: "llama-3.1-8b-instant",
+    model: notebookType === "assignment" ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant",
     messages: [{ role: "system", content: systemPrompt }, ...history],
     temperature: 0.7,
+    max_tokens: notebookType === "assignment" ? 512 : 800,
     stream: true,
   }).withResponse();
 

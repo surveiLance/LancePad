@@ -1,3 +1,5 @@
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+
 type TiptapNode = { type?: string; text?: string; marks?: { type: string }[]; content?: TiptapNode[]; attrs?: Record<string, unknown> };
 
 function nodeToMarkdown(node: TiptapNode, indent = ""): string {
@@ -39,6 +41,88 @@ export function downloadMarkdown(title: string, tiptapJson: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = `${title.replace(/[^a-z0-9]/gi, "_")}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function extractPlainText(node: TiptapNode): string {
+  if (node.type === "text") return node.text ?? "";
+  return (node.content ?? []).map(extractPlainText).join("");
+}
+
+function nodeToRuns(node: TiptapNode): TextRun[] {
+  if (node.type === "text") {
+    return [new TextRun({
+      text: node.text ?? "",
+      bold: node.marks?.some((m) => m.type === "bold"),
+      italics: node.marks?.some((m) => m.type === "italic"),
+      font: node.marks?.some((m) => m.type === "code") ? "Courier New" : undefined,
+    })];
+  }
+  return (node.content ?? []).flatMap(nodeToRuns);
+}
+
+function tiptapNodeToDocx(node: TiptapNode): Paragraph[] {
+  if (node.type === "doc") {
+    return (node.content ?? []).flatMap(tiptapNodeToDocx);
+  }
+  if (node.type === "heading") {
+    const level = (node.attrs?.level as number) ?? 2;
+    const headingMap = {
+      1: HeadingLevel.HEADING_1,
+      2: HeadingLevel.HEADING_2,
+      3: HeadingLevel.HEADING_3,
+    } as Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]>;
+    return [new Paragraph({ text: extractPlainText(node), heading: headingMap[level] ?? HeadingLevel.HEADING_2 })];
+  }
+  if (node.type === "paragraph") {
+    const runs = nodeToRuns(node);
+    return [new Paragraph({ children: runs.length ? runs : [new TextRun("")] })];
+  }
+  if (node.type === "bulletList") {
+    return (node.content ?? []).map((item) =>
+      new Paragraph({ children: [new TextRun({ text: "• " + extractPlainText(item) })] })
+    );
+  }
+  if (node.type === "orderedList") {
+    return (node.content ?? []).map((item, i) =>
+      new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${extractPlainText(item)}` })] })
+    );
+  }
+  if (node.type === "blockquote") {
+    return [new Paragraph({ children: [new TextRun({ text: extractPlainText(node), italics: true })], indent: { left: 720 } })];
+  }
+  if (node.type === "horizontalRule") {
+    return [new Paragraph({ text: "─────────────────────────────────────" })];
+  }
+  return [];
+}
+
+export async function downloadDocx(title: string, tiptapJson: string) {
+  let paragraphs: Paragraph[] = [];
+  try {
+    const doc_json = JSON.parse(tiptapJson);
+    paragraphs = tiptapNodeToDocx(doc_json);
+  } catch {
+    paragraphs = [new Paragraph({ text: tiptapJson })];
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({ text: title, heading: HeadingLevel.TITLE }),
+        new Paragraph({ text: "" }),
+        ...paragraphs,
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/[^a-z0-9]/gi, "_")}.docx`;
   a.click();
   URL.revokeObjectURL(url);
 }
