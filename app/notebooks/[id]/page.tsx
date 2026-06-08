@@ -74,6 +74,7 @@ export default function NotebookPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [outlineTopic, setOutlineTopic] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function handleNoteChange(content: string) {
@@ -116,7 +117,7 @@ export default function NotebookPage() {
     } else {
       setMessages([{
         role: "assistant",
-        content: `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.\n\nOh, and if your notes are empty, just say **"start an outline for [topic]"** and I'll build one for you 🍳`,
+        content: `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.`,
       }]);
     }
   }, [savedMessages, notebook]);
@@ -192,13 +193,30 @@ export default function NotebookPage() {
     setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "undo_edit" } : m));
   }
 
+  function handleAppendEdit(idx: number) {
+    if (!pendingEditTiptap) return;
+    setUndoContent(noteContent);
+    try {
+      const existing = noteContent ? JSON.parse(noteContent) : { type: "doc", content: [] };
+      const incoming = JSON.parse(pendingEditTiptap);
+      const merged = JSON.stringify({ type: "doc", content: [...(existing.content ?? []), ...(incoming.content ?? [])] });
+      handleNoteChange(merged);
+      handleSave(merged);
+    } catch {
+      handleNoteChange(pendingEditTiptap);
+      handleSave(pendingEditTiptap);
+    }
+    setPendingEditTiptap(null);
+    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "append_edit" } : m));
+  }
+
   function handleRejectEdit(idx: number) {
     setPendingEditTiptap(null);
     setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: undefined } : m));
   }
 
   function handleUndoEdit(idx: number) {
-    if (!undoContent) return;
+    if (undoContent === null) return;
     const applied = noteContent;
     handleNoteChange(undoContent);
     handleSave(undoContent);
@@ -482,6 +500,33 @@ export default function NotebookPage() {
 
         {/* Right — LanceBot chat */}
         <div className={cn("w-full md:w-80 xl:w-96 flex-col min-h-0 bg-gray-950", "md:flex", mobileTab === "chat" ? "flex" : "hidden")}>
+          {/* Outline quick-start — always visible */}
+          <div className="border-b border-gray-800/60 px-3 py-2 flex-shrink-0">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!outlineTopic.trim() || chatLoading) return;
+                sendMessage(`Start an outline for ${outlineTopic.trim()}`);
+                setOutlineTopic("");
+              }}
+              className="flex gap-2"
+            >
+              <input
+                value={outlineTopic}
+                onChange={(e) => setOutlineTopic(e.target.value)}
+                placeholder="Start outline for..."
+                className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!outlineTopic.trim() || chatLoading}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                Go
+              </button>
+            </form>
+          </div>
+
           {/* Bot header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800/60 flex-shrink-0">
             <LanceBot mood={botMood} size={42} animate={botMood === "thinking"} />
@@ -494,7 +539,7 @@ export default function NotebookPage() {
             <button
               onClick={async () => {
                 await clearMessages({ notebookId });
-                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?\n\nBy the way — if you want me to kick things off, just say **\"start an outline for [topic]\"** and I'll build it for you 🍳" }]);
+                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?" }]);
                 setBotMood("happy");
               }}
               className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
@@ -525,13 +570,20 @@ export default function NotebookPage() {
                       : <span className="text-gray-500 animate-pulse">...</span>}
                   </div>
                   {msg.action === "pending_edit" && pendingEditTiptap !== null && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => handleApplyEdit(i)}
                         className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 bg-green-950/40 hover:bg-green-900/40 border border-green-800/50 px-2.5 py-1 rounded-full transition-colors"
                       >
                         <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Apply
+                        Replace notes
+                      </button>
+                      <button
+                        onClick={() => handleAppendEdit(i)}
+                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-800/50 px-2.5 py-1 rounded-full transition-colors"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        Add to notes
                       </button>
                       <button
                         onClick={() => handleRejectEdit(i)}
@@ -542,7 +594,7 @@ export default function NotebookPage() {
                       </button>
                     </div>
                   )}
-                  {msg.action === "undo_edit" && undoContent !== null && (
+                  {(msg.action === "undo_edit" || msg.action === "append_edit") && undoContent !== null && (
                     <button
                       onClick={() => handleUndoEdit(i)}
                       className="self-start flex items-center gap-1 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1 rounded-full transition-colors"

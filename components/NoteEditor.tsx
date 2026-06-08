@@ -100,7 +100,8 @@ export default function NoteEditor({ content, onChange, isPreview = false }: Not
     const current = JSON.stringify(editor.getJSON());
     if (current !== content) {
       try {
-        editor.commands.setContent(content ? JSON.parse(content) : "");
+        // emitUpdate:false prevents onUpdate from feeding back into noteContent state
+        editor.commands.setContent(content ? JSON.parse(content) : "", { emitUpdate: false });
       } catch {}
     }
   }, [content, editor]);
