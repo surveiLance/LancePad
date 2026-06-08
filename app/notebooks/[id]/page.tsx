@@ -31,6 +31,13 @@ const QUIZ_TYPES = [
   { type: "fill_blank",      label: "Fill in the Blank", desc: "Complete the missing word",   icon: "📝" },
 ];
 
+const ASSIGNMENT_PROMPTS = [
+  "Draft an introduction",
+  "What's missing based on requirements?",
+  "Expand this section",
+  "Polish the writing",
+];
+
 const STARTER_PROMPTS = [
   "Quick summary of key points",
   "Quiz me on what I should know",
@@ -115,9 +122,12 @@ export default function NotebookPage() {
     if (savedMessages.length > 0) {
       setMessages(savedMessages.map((m) => ({ role: m.role, content: m.content })));
     } else {
+      const isAssignment = notebook.type === "assignment";
       setMessages([{
         role: "assistant",
-        content: `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.`,
+        content: isAssignment
+          ? `Hey! 📋 I'm LanceBot — your assignment partner for **${notebook.title}**.\n\nPaste your requirements above and I'll help structure and complete this with you. Or just start talking through what the assignment needs.`
+          : `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.`,
       }]);
     }
   }, [savedMessages, notebook]);
@@ -242,7 +252,7 @@ export default function NotebookPage() {
         const res = await fetch("/api/lancebot-edit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instruction: content, noteContent, notebookTitle: notebook?.title, username }),
+          body: JSON.stringify({ instruction: content, noteContent, notebookTitle: notebook?.title, username, notebookType: notebook?.type }),
         });
         const { message: botMsg, editedMarkdown } = await res.json();
         setBotMood("happy");
@@ -275,7 +285,7 @@ export default function NotebookPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username, notebookType: notebook?.type }),
       });
       if (!res.body) throw new Error("No stream");
       setGroqUsage({
@@ -506,23 +516,37 @@ export default function NotebookPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!outlineTopic.trim() || chatLoading) return;
-                sendMessage(`Start an outline for ${outlineTopic.trim()}`);
+                const msg = notebook.type === "assignment"
+                  ? `Here are my assignment requirements:\n\n${outlineTopic.trim()}\n\nAnalyze these requirements and create a structured assignment template with clearly labeled sections I need to fill in.`
+                  : `Start an outline for ${outlineTopic.trim()}`;
+                sendMessage(msg);
                 setOutlineTopic("");
               }}
               className="flex gap-2"
             >
-              <input
-                value={outlineTopic}
-                onChange={(e) => setOutlineTopic(e.target.value)}
-                placeholder="Start outline for..."
-                className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors"
-              />
+              {notebook.type === "assignment" ? (
+                <textarea
+                  value={outlineTopic}
+                  onChange={(e) => setOutlineTopic(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+                  placeholder="Paste assignment requirements or brief..."
+                  rows={2}
+                  className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors resize-none"
+                />
+              ) : (
+                <input
+                  value={outlineTopic}
+                  onChange={(e) => setOutlineTopic(e.target.value)}
+                  placeholder="Start outline for..."
+                  className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors"
+                />
+              )}
               <button
                 type="submit"
                 disabled={!outlineTopic.trim() || chatLoading}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors self-end"
               >
-                Go
+                {notebook.type === "assignment" ? "Analyze" : "Go"}
               </button>
             </form>
           </div>
@@ -533,13 +557,13 @@ export default function NotebookPage() {
             <div className="flex-1 min-w-0">
               <p className="text-white font-semibold text-sm">LanceBot</p>
               <p className="text-gray-500 text-xs truncate">
-                {chatLoading ? "typing..." : `tutor · ${notebook.emoji} ${notebook.title}`}
+                {chatLoading ? "typing..." : `${notebook.type === "assignment" ? "assistant" : "tutor"} · ${notebook.emoji} ${notebook.title}`}
               </p>
             </div>
             <button
               onClick={async () => {
                 await clearMessages({ notebookId });
-                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?" }]);
+                setMessages([{ role: "assistant", content: notebook.type === "assignment" ? "Fresh start! 🔄 Paste your requirements above or tell me what you need help with." : "Fresh start! 🔄 What do you want to go over?" }]);
                 setBotMood("happy");
               }}
               className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
@@ -612,7 +636,7 @@ export default function NotebookPage() {
           {/* Starter prompts */}
           {messages.length <= 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5 flex-shrink-0">
-              {STARTER_PROMPTS.map((p) => (
+              {(notebook.type === "assignment" ? ASSIGNMENT_PROMPTS : STARTER_PROMPTS).map((p) => (
                 <button
                   key={p}
                   onClick={() => sendMessage(p)}

@@ -110,8 +110,8 @@ export default function NotebooksPage() {
     return null;
   }
 
-  async function handleCreate(title: string, color: string, emoji: string, folderId?: Id<"folders">) {
-    const id = await createNotebook({ title, color, emoji, folderId });
+  async function handleCreate(title: string, color: string, emoji: string, folderId?: Id<"folders">, type?: "notebook" | "assignment") {
+    const id = await createNotebook({ title, color, emoji, folderId, type });
     router.push(`/notebooks/${id}`);
   }
 

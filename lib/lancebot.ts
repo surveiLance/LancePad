@@ -51,6 +51,29 @@ ${noteContent || "No notes have been added yet — encourage the user to add som
 Stick to this content when answering questions. You can elaborate and explain, but ground your answers in these notes.`;
 }
 
+export function buildAssistantSystemPrompt(assignmentTitle: string, noteContent: string, username?: string | null): string {
+  const userLine = username ? `\n\nThe student's name is ${username}. Address them by name occasionally.` : "";
+  return `${LANCEBOT_SYSTEM_PROMPT}${userLine}
+
+---
+ASSIGNMENT MODE — You are helping complete an actual assignment, NOT studying for a test.
+
+Assignment: "${assignmentTitle}"
+
+Your job:
+- Help the student write, draft, structure, and polish their actual deliverable
+- Reference the requirements/brief below at all times — every suggestion should move them closer to completing the assignment
+- When drafting content, write as if you're a collaborator: suggest phrasing, structure sections, fill in gaps
+- Flag anything that seems to be missing based on the requirements
+- Never just explain concepts — actively help produce the work
+- Keep edits concise and purposeful. No filler.
+
+Current work / requirements in the editor:
+${noteContent || "Nothing yet — ask the student to paste their assignment requirements or brief."}
+
+When the student asks you to draft, write, or generate a section: return content they can directly use, not advice about what to write.`;
+}
+
 export function buildHelpSystemPrompt(username?: string | null): string {
   const userLine = username ? `\n\nThe student's name is ${username}. Address them by name occasionally — keep it personal and fun.` : "";
   return `${LANCEBOT_SYSTEM_PROMPT}${userLine}

@@ -23,6 +23,7 @@ export default defineSchema({
     title: v.string(),
     color: v.string(),
     emoji: v.string(),
+    type: v.optional(v.union(v.literal("notebook"), v.literal("assignment"))),
   }).index("by_user", ["userId"]).index("by_folder", ["folderId"]),
 
   notes: defineTable({
