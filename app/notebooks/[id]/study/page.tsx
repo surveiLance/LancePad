@@ -56,6 +56,7 @@ export default function StudyPage() {
   const [done, setDone] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summary, setSummary] = useState("");
+  const [botHovered, setBotHovered] = useState(false);
 
   const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Tama! 🎯", "Sige ganyan! 💪", "Ayos! 💯", "Boom! ✨", "Lodi talaga! 🔥", "Clean! ✅"];
   const WRONG   = ["Ay, mali pala 😔", "Tricky yan, next time! 👀", "Huwag mag-alala, review lang! 💪", "Oops! 😅", "Kaya mo yan next time! 🤙", "Sus, malapit ka na! 😄"];
@@ -116,6 +117,30 @@ export default function StudyPage() {
       setBotMessage(explanation);
     } catch {
       setBotComment("sad", pick(WRONG));
+    }
+  }
+
+  async function handleHint() {
+    if (!card || grading) return;
+    setBotHovered(false);
+    setBotComment("thinking", "Sandali lang, thinking of a hint... 🤔");
+    try {
+      const res = await fetch("/api/lancebot-explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: card.question,
+          correctAnswer: card.answer,
+          userAnswer: "give a hint only — do NOT reveal the full answer, just nudge them in the right direction in 1 sentence",
+          notebookTitle: notebook?.title,
+          noteContent: note?.content ?? "",
+          username,
+        }),
+      });
+      const { explanation } = await res.json();
+      setBotComment("happy", explanation);
+    } catch {
+      setBotComment("happy", "Basahin mo yung notes mo — nandun yung sagot! 📖");
     }
   }
 
@@ -449,17 +474,48 @@ export default function StudyPage() {
         )}
       </div>
 
-      {/* LanceBot — bottom left with timed speech bubble */}
-      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2 pointer-events-none">
+      {/* LanceBot — bottom left */}
+      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2">
+        {/* Speech bubble — pointer-events-none so it doesn't block the quiz */}
         {botMessage && (
           <div
             key={botMessage}
-            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 text-base text-gray-200 w-[580px] max-w-[calc(100vw-6rem)] leading-relaxed shadow-lg bounce-in"
+            className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 text-base text-gray-200 w-[580px] max-w-[calc(100vw-6rem)] leading-relaxed shadow-lg bounce-in pointer-events-none"
           >
             {botMessage}
           </div>
         )}
-        <LanceBot mood={botMood} size={72} animate />
+
+        {/* Bot + hint affordance */}
+        <div
+          className="relative flex flex-col items-start gap-1.5"
+          onMouseEnter={() => setBotHovered(true)}
+          onMouseLeave={() => setBotHovered(false)}
+        >
+          {/* Hover actions */}
+          {botHovered && cardState === "question" && !done && (
+            <div className="flex items-center gap-2 bounce-in">
+              <button
+                onClick={handleHint}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-lg"
+              >
+                <Lightbulb size={12} />
+                Get a hint
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-end gap-2">
+            <LanceBot mood={botMood} size={72} animate />
+            {/* Persistent label */}
+            {!botHovered && (
+              <div className="mb-1 flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-900/80 border border-gray-800 text-gray-500 text-[10px] font-medium select-none bounce-in">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                hover me
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
