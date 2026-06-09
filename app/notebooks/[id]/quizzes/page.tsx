@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-react";
-import { useQuery } from "convex/react";
+import { ArrowLeft, CheckCircle2, XCircle, ChevronDown, ChevronRight, RotateCcw, Target } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import LanceBot from "@/components/LanceBot";
@@ -26,6 +26,15 @@ function timeAgo(ms: number) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function formatDate(ms: number) {
+  const d = new Date(ms);
+  const month = d.toLocaleString("en-US", { month: "short" });
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const thisYear = new Date().getFullYear();
+  return year === thisYear ? `${month} ${day}` : `${month} ${day}, ${year}`;
+}
+
 export default function QuizzesPage() {
   const params = useParams();
   const router = useRouter();
@@ -33,8 +42,25 @@ export default function QuizzesPage() {
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
   const sessions = useQuery(api.quizSessions.getByNotebook, { notebookId });
+  const createSession = useMutation(api.quizSessions.create);
 
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [starting, setStarting] = useState<string | null>(null);
+
+  async function startRetake(session: NonNullable<typeof sessions>[number], wrongOnly: boolean) {
+    if (!session || starting) return;
+    const key = `${session._id}-${wrongOnly ? "wrong" : "all"}`;
+    setStarting(key);
+    const wrongIndices = new Set((session.results ?? []).filter((r) => r.result === "incorrect").map((r) => r.questionIndex));
+    const questions = wrongOnly
+      ? session.questions.filter((_, i) => wrongIndices.has(i))
+      : session.questions;
+    if (questions.length === 0) return setStarting(null);
+    const name = wrongOnly ? "Missed Answers" : "Retake";
+    const newId = await createSession({ notebookId, quizType: session.quizType, name, questions });
+    setStarting(null);
+    router.push(`/notebooks/${notebookId}/study?session=${newId}`);
+  }
 
   if (notebook === null) { router.push("/notebooks"); return null; }
   if (!sessions) return <LoadingScreen />;
@@ -84,10 +110,7 @@ export default function QuizzesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-white font-semibold text-sm">
-                          Quiz #{sessions.length - si}
-                        </span>
-                        <span className="text-xs text-gray-500 px-2 py-0.5 bg-gray-800 rounded-full">
-                          {QUIZ_TYPE_LABEL[session.quizType] ?? session.quizType}
+                          {(session.name ?? QUIZ_TYPE_LABEL[session.quizType] ?? session.quizType)} · {formatDate(session._creationTime)}
                         </span>
                         {!completed && (
                           <span className="text-xs text-yellow-400 px-2 py-0.5 bg-yellow-950/40 border border-yellow-800/40 rounded-full">
@@ -141,7 +164,7 @@ export default function QuizzesPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-white font-medium mb-1 leading-snug">{q.question}</p>
-                                {q.type === "multiple_choice" && q.options && (
+                                {res && q.type === "multiple_choice" && q.options && (
                                   <div className="grid grid-cols-2 gap-1.5 mb-2">
                                     {q.options.map((opt, oi) => (
                                       <div
@@ -159,20 +182,52 @@ export default function QuizzesPage() {
                                     ))}
                                   </div>
                                 )}
-                                <div className="text-xs text-gray-500">
-                                  <span className="text-purple-400 font-medium">Answer: </span>
-                                  <span className="text-gray-300">{q.answer}</span>
-                                  {res && res.result === "incorrect" && (
-                                    <span className="ml-3 text-red-400">
-                                      Your answer: {res.userAnswer}
-                                    </span>
+                                {res ? (
+                                <div className="text-xs space-y-0.5">
+                                  <div>
+                                    <span className="text-purple-400 font-medium">Answer: </span>
+                                    <span className="text-gray-300">{q.answer}</span>
+                                  </div>
+                                  {res.result === "incorrect" && (
+                                    <div>
+                                      <span className="text-red-400 font-medium">Your answer: </span>
+                                      <span className="text-red-300">{res.userAnswer}</span>
+                                    </div>
                                   )}
                                 </div>
+                                ) : (
+                                  <p className="text-xs text-gray-600 italic">Not answered yet</p>
+                                )}
                               </div>
                             </div>
                           </div>
                         );
                       })}
+
+                      {/* Retake actions */}
+                      {completed && (
+                        <div className="px-4 py-3 flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => startRetake(session, false)}
+                            disabled={starting === `${session._id}-all`}
+                          >
+                            <RotateCcw size={13} />
+                            {starting === `${session._id}-all` ? "Starting..." : "Retake quiz"}
+                          </Button>
+                          {(session.results?.some((r) => r.result === "incorrect")) && (
+                            <Button
+                              size="sm"
+                              onClick={() => startRetake(session, true)}
+                              disabled={starting === `${session._id}-wrong`}
+                            >
+                              <Target size={13} />
+                              {starting === `${session._id}-wrong` ? "Starting..." : "Practice missed"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

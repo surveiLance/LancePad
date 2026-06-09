@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, RotateCcw, Lightbulb } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -57,9 +57,9 @@ export default function StudyPage() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summary, setSummary] = useState("");
 
-  const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Boom! ✨", "Nailed it! 🎯", "Clean! 💯", "Sige! 💪"];
-  const WRONG   = ["Aww, not quite 😔", "That one's tricky!", "Review that one 👀", "Oops! 😅", "We'll get it next time 💪"];
-  const PARTIAL = ["Almost there! 🤏", "Good effort! 💪", "Close! Keep it up ✨", "You got the gist!"];
+  const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Tama! 🎯", "Sige ganyan! 💪", "Ayos! 💯", "Boom! ✨", "Lodi talaga! 🔥", "Clean! ✅"];
+  const WRONG   = ["Ay, mali pala 😔", "Tricky yan, next time! 👀", "Huwag mag-alala, review lang! 💪", "Oops! 😅", "Kaya mo yan next time! 🤙", "Sus, malapit ka na! 😄"];
+  const PARTIAL = ["Halos tama na! 🤏", "Good effort! 💪", "Malapit ka na, keep it up ✨", "Gets mo na yung idea!"];
 
   function pick(arr: string[]) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -129,6 +129,28 @@ export default function StudyPage() {
       setBotComment("celebrate", pick(CORRECT));
     } else {
       explainWrongAnswer(card.question, card.answer, option);
+    }
+  }
+
+  function fillBlankIsCorrect(userAnswer: string, correctAnswer: string): boolean {
+    const u = userAnswer.toLowerCase().trim();
+    const a = correctAnswer.toLowerCase().trim();
+    if (u === a) return true;
+    // Accept if user typed only the first N words of the answer (handles AI over-generating the answer)
+    const uWords = u.split(/\s+/);
+    const aWords = a.split(/\s+/);
+    return uWords.length < aWords.length && aWords.slice(0, uWords.length).join(" ") === u;
+  }
+
+  function handleFillBlank() {
+    if (!shortAnswer.trim() || cardState !== "question" || !card) return;
+    setCardState("answered");
+    const isCorrect = fillBlankIsCorrect(shortAnswer, card.answer);
+    recordResult(isCorrect, shortAnswer);
+    if (isCorrect) {
+      setBotComment("celebrate", pick(CORRECT));
+    } else {
+      explainWrongAnswer(card.question, card.answer, shortAnswer);
     }
   }
 
@@ -369,17 +391,21 @@ export default function StudyPage() {
           <div className="space-y-3">
             <input type="text" placeholder="Fill in the blank..." value={shortAnswer}
               onChange={(e) => setShortAnswer(e.target.value)} disabled={cardState !== "question"}
-              onKeyDown={(e) => e.key === "Enter" && handleShortAnswer()}
+              onKeyDown={(e) => e.key === "Enter" && handleFillBlank()}
               className="w-full bg-gray-900 border border-gray-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-colors" />
-            {cardState === "question" && <Button onClick={handleShortAnswer} disabled={!shortAnswer.trim()}>Check answer</Button>}
-            {cardState === "answered" && (
-              <div className={cn("rounded-xl px-4 py-3 text-sm",
-                shortAnswer.toLowerCase().trim() === card.answer.toLowerCase().trim()
-                  ? "bg-green-900/30 border border-green-700 text-green-300"
-                  : "bg-red-900/30 border border-red-700 text-red-300")}>
-                <span className="font-semibold">Correct answer: </span>{card.answer}
-              </div>
-            )}
+            {cardState === "question" && <Button onClick={handleFillBlank} disabled={!shortAnswer.trim()}>Check answer</Button>}
+            {cardState === "answered" && (() => {
+              const correct = fillBlankIsCorrect(shortAnswer, card.answer);
+              return (
+                <div className={cn("rounded-xl px-4 py-3 text-sm space-y-1",
+                  correct
+                    ? "bg-green-900/30 border border-green-700 text-green-300"
+                    : "bg-red-900/30 border border-red-700 text-red-300")}>
+                  <div><span className="font-semibold">Correct answer: </span>{card.answer}</div>
+                  {!correct && <div><span className="font-semibold">Your answer: </span>{shortAnswer}</div>}
+                </div>
+              );
+            })()}
           </div>
         )}
 

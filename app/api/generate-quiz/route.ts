@@ -106,11 +106,13 @@ ${plainText}
 Generate exactly 10 fill-in-the-blank questions as JSON. Use ___ for the blank.
 The blank must be filled by a key term found in the notes.
 
+CRITICAL: The "answer" field must contain ONLY the word(s) that replace the ___ in the question — nothing more. Do NOT repeat words already visible in the question sentence. For example, if the question is "___ and information are used interchangeably", the answer is "Data", not "Data and information".
+
 Return ONLY valid JSON array, no markdown, no code blocks:
 [
   {
     "question": "The ___ is responsible for...",
-    "answer": "exact word or phrase for the blank",
+    "answer": "exact word or short phrase that fills the blank only",
     "type": "fill_blank"
   }
 ]

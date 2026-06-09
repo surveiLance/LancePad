@@ -5,6 +5,7 @@ export const create = mutation({
   args: {
     notebookId: v.id("notebooks"),
     quizType: v.string(),
+    name: v.optional(v.string()),
     questions: v.array(v.object({
       question: v.string(),
       answer: v.string(),
@@ -16,6 +17,7 @@ export const create = mutation({
     return await ctx.db.insert("quizSessions", {
       notebookId: args.notebookId,
       quizType: args.quizType,
+      name: args.name,
       questions: args.questions,
     });
   },

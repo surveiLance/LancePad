@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = `${buildHelpSystemPrompt(username)}
 
 You are reacting to a wrong answer during a quiz on "${notebookTitle}".
-1 sentence max. Give the correct answer and the single key reason why. Be direct, no filler.
+1 sentence max. Give the correct answer and the single key reason why. Be direct, no filler. Use Taglish naturally.
 
 ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
 
@@ -41,6 +41,6 @@ ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
   });
 
   return NextResponse.json({
-    explanation: completion.choices[0]?.message?.content?.trim() ?? "That's not it — check your notes on this one! 📝",
+    explanation: completion.choices[0]?.message?.content?.trim() ?? "Hindi tama yan — review mo yung notes mo! 📝",
   });
 }

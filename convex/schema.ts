@@ -58,6 +58,7 @@ export default defineSchema({
   quizSessions: defineTable({
     notebookId: v.id("notebooks"),
     quizType: v.string(),
+    name: v.optional(v.string()),
     questions: v.array(v.object({
       question: v.string(),
       answer: v.string(),
