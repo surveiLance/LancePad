@@ -80,7 +80,7 @@ export default function SignupPage() {
         <div className="flex flex-col items-center mb-8">
           <LanceBot mood="happy" size={72} />
           <h1 className="text-3xl font-bold text-white mt-4">LancePad</h1>
-          <p className="text-gray-400 text-sm mt-1">Your AI study buddy is waiting 🧠</p>
+          <p className="text-gray-400 text-sm mt-1">Your study buddy is ready.</p>
         </div>
 
 

@@ -452,10 +452,10 @@ export default function CalendarPage() {
               <LanceBot mood={selectedTasks.length > 0 ? "happy" : "idle"} size={48} animate />
               <div className="bg-gray-900/80 border border-purple-800/40 rounded-2xl rounded-bl-sm px-4 py-2.5 text-xs text-purple-200 leading-relaxed flex-1">
                 {selectedTasks.length === 0
-                  ? "Walang tasks dito. Mag-schedule na tayo ng study session! 📅"
+                  ? "No tasks here. Add one if needed 📅"
                   : selectedTasks.every((t) => t.completed)
-                  ? "Grabe! Natapos mo lahat! Ang galing mo talaga 🎉"
-                  : `${selectedTasks.filter(t => !t.completed).length} ${selectedTasks.filter(t => !t.completed).length === 1 ? "task" : "tasks"} left. Kaya mo yan, pre! 💪`}
+                  ? "All done. Ayos 🎉"
+                  : `${selectedTasks.filter(t => !t.completed).length} ${selectedTasks.filter(t => !t.completed).length === 1 ? "task" : "tasks"} left. Kaya yan 💪`}
               </div>
             </div>
           </div>

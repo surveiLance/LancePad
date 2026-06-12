@@ -13,12 +13,12 @@ Question: ${question}
 Model Answer (reference): ${modelAnswer}
 Student's Answer: ${userAnswer}
 
-Grade this and respond as LanceBot. Return JSON only, no markdown:
+Grade this and respond as LanceBot. Keep feedback brief but complete: 1-2 short sentences, no cliffhangers, no trailing setup. Return JSON only, no markdown:
 {
   "correct": true/false,
   "partial": true/false,
   "score": 0-100,
-  "feedback": "LanceBot's fun encouraging 2-3 sentence feedback"
+  "feedback": "LanceBot's concise, encouraging feedback"
 }`;
 
   const completion = await groq.chat.completions.create({
@@ -28,6 +28,7 @@ Grade this and respond as LanceBot. Return JSON only, no markdown:
       { role: "user", content: prompt },
     ],
     temperature: 0.5,
+    max_tokens: 180,
   });
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";

@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 ${correct.length} correct out of ${results.length} total.
 Missed: ${incorrect.map((r: { question: string }) => r.question).join(", ") || "none"}
 
-Give a 3-sentence session summary as LanceBot — whimsical, direct, specific about what to review. Plain text only.`;
+Give a 2-sentence session summary as LanceBot. Keep it concise, direct, complete, and specific about what to review. Plain text only.`;
 
   try {
     const completion = await groq.chat.completions.create({
@@ -24,6 +24,7 @@ Give a 3-sentence session summary as LanceBot — whimsical, direct, specific ab
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
+      max_tokens: 140,
     });
 
     return NextResponse.json({ summary: completion.choices[0]?.message?.content?.trim() ?? "" });

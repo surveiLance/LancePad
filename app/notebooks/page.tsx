@@ -63,9 +63,9 @@ export default function NotebooksPage() {
 
   const greetings = [
     `Ready to lock in${username ? `, ${username}` : ""}? 🔒`,
-    `What are we cooking today${username ? `, ${username}` : ""}? 🍳`,
-    `Back again${username ? `, ${username}` : ""}! Let's get it 🚀`,
-    `Let's get that A 🤪`,
+    `What are we studying today${username ? `, ${username}` : ""}? 📚`,
+    `Back again${username ? `, ${username}` : ""}. Let's start 🚀`,
+    `Small session. Real progress.`,
   ];
   const greeting = greetings[Math.floor(Date.now() / 86400000) % greetings.length];
 
@@ -74,7 +74,7 @@ export default function NotebooksPage() {
 
   useEffect(() => {
     if (!welcomed && isAuthenticated && username) {
-      setBubble(`Welcome ${username}, tara aral na! 📚`);
+      setBubble(`Welcome, ${username}. Tara, study time 📚`);
       setWelcomed(true);
       return;
     }
@@ -83,19 +83,19 @@ export default function NotebooksPage() {
     const upcoming = upcomingTasks.filter((t) => t.date !== todayStr && !t.completed);
 
     const quips = pending.length > 0 ? [
-      `Uy! May ${pending.length} task ka pa ngayon. Sige na pre 👀`,
-      `${pending[0]?.title}? Di pa tapos yan! Tara na 💪`,
-      `Huwag mong kalimutan yung tasks mo ngayon ha! 📅`,
+      `${pending.length} task${pending.length === 1 ? "" : "s"} left today 👀`,
+      `${pending[0]?.title}? Still pending 💪`,
+      `Don't forget today's tasks 📅`,
     ] : upcoming.length > 0 ? [
-      `May ${upcoming.length} incoming tasks ka pa. Mag-aral na habang maaga 📅`,
-      `Uy, may darating na tasks. Mag-aral na habang maaga 📚`,
-      `I see your schedule. Busy ka pre. Kaya mo yan 💪`,
+      `${upcoming.length} upcoming task${upcoming.length === 1 ? "" : "s"} 📅`,
+      `Upcoming tasks. Start early 📚`,
+      `Busy schedule. Kaya yan 💪`,
     ] : [
-      `Uy, pumunta ka na dito! Mag-aral na tayo 📚`,
-      `Bro is just staring at the screen 💀 sige na pre`,
-      "Walang tasks? Perfect time mag-aral nang walang pressure 😌",
-      "Mag-add ka ng tasks sa calendar para di ka malimot 📅",
-      "Bet? Tara na, mag-aral tayo 🚀",
+      `Pick a notebook 📚`,
+      `Sige, start small.`,
+      "No tasks. Good time to study 😌",
+      "Add calendar tasks if needed 📅",
+      "Tara, one session 🚀",
     ];
 
     const show = () => setBubble(quips[Math.floor(Math.random() * quips.length)]);

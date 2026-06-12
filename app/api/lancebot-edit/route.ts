@@ -29,11 +29,12 @@ export async function POST(req: NextRequest) {
 You are ${isAssignment ? `helping complete an assignment called "${notebookTitle}"` : `editing a student's notes for "${notebookTitle}"`}.
 Return ONLY valid JSON (no markdown code blocks), exactly this structure:
 {
-  "message": "brief 1-2 sentence LanceBot-style confirmation of what you did",
+  "message": "brief LanceBot-style confirmation in 1 complete sentence",
   "editedMarkdown": "the complete updated ${isAssignment ? "assignment work" : "notes"} in markdown format"
 }
 
 Rules:
+- Keep the message concise, mostly English, and complete. No cliffhangers or long jokes.
 - editedMarkdown must be the COMPLETE updated content — not just the changed part
 - Preserve everything the student didn't ask you to change
 - Use proper markdown: ## for headings, - for bullets, **bold**, etc.

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = `${buildHelpSystemPrompt(username)}
 
 You are reacting to a wrong answer during a quiz on "${notebookTitle}".
-1 sentence max. Give the correct answer and the single key reason why. Be direct, no filler. Use Taglish naturally.
+1 short complete sentence max. Give the correct answer and one reason why. Be direct, no filler, and do not end mid-thought. Keep it mostly English; use at most one light Filipino connector/reaction like "sige", "uy", "ay", "naman", or "gets?" only if it sounds natural.
 
 ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
 
@@ -37,10 +37,10 @@ ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
       { role: "user", content: `Question: ${question}\nCorrect answer: ${correctAnswer}\nStudent answered: ${userAnswer}` },
     ],
     temperature: 0.6,
-    max_tokens: 60,
+    max_tokens: 90,
   });
 
   return NextResponse.json({
-    explanation: completion.choices[0]?.message?.content?.trim() ?? "Hindi tama yan — review mo yung notes mo! 📝",
+    explanation: completion.choices[0]?.message?.content?.trim() ?? "Not quite — check the notes and try the idea again 📝",
   });
 }

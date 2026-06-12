@@ -58,9 +58,9 @@ export default function StudyPage() {
   const [summary, setSummary] = useState("");
   const [botHovered, setBotHovered] = useState(false);
 
-  const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Tama! 🎯", "Sige ganyan! 💪", "Ayos! 💯", "Boom! ✨", "Lodi talaga! 🔥", "Clean! ✅"];
-  const WRONG   = ["Ay, mali pala 😔", "Tricky yan, next time! 👀", "Huwag mag-alala, review lang! 💪", "Oops! 😅", "Kaya mo yan next time! 🤙", "Sus, malapit ka na! 😄"];
-  const PARTIAL = ["Halos tama na! 🤏", "Good effort! 💪", "Malapit ka na, keep it up ✨", "Gets mo na yung idea!"];
+  const CORRECT = ["Yessss! 🔥", "LET'S GO! 🎉", "Correct. Ayos! 🎯", "Sige, that's the move 💪", "Clean answer 💯", "Boom! ✨", "Nice work, talaga 🔥", "Clean! ✅"];
+  const WRONG   = ["Not quite, but we can fix it 😔", "Tricky one. Next time 👀", "No worries, review mode lang 💪", "Oops! 😅", "You got this next time 🤙", "Ay, close. Keep going 😄"];
+  const PARTIAL = ["Almost there 🤏", "Good effort 💪", "Close, keep it up ✨", "You have the main idea, gets?"];
 
   function pick(arr: string[]) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -123,7 +123,7 @@ export default function StudyPage() {
   async function handleHint() {
     if (!card || grading) return;
     setBotHovered(false);
-    setBotComment("thinking", "Sandali lang, thinking of a hint... 🤔");
+    setBotComment("thinking", "One sec, thinking of a hint... 🤔");
     try {
       const res = await fetch("/api/lancebot-explain", {
         method: "POST",
@@ -140,7 +140,7 @@ export default function StudyPage() {
       const { explanation } = await res.json();
       setBotComment("happy", explanation);
     } catch {
-      setBotComment("happy", "Basahin mo yung notes mo — nandun yung sagot! 📖");
+      setBotComment("happy", "Check your notes — the answer is in there, promise 📖");
     }
   }
 

@@ -132,8 +132,8 @@ export default function NotebookPage() {
       setMessages([{
         role: "assistant",
         content: isAssignment
-          ? `Hey! 📋 I'm LanceBot — your assignment partner for **${notebook.title}**.\n\nPaste your requirements above and I'll help structure and complete this with you. Or just start talking through what the assignment needs.`
-          : `Hey! 👋 I'm LanceBot, your tutor for **${notebook.title}**.\n\nAsk me anything — summaries, explanations, practice questions — I got you.`,
+          ? `Hey, I'm LanceBot for **${notebook.title}**. Paste the requirements or tell me what needs to happen.`
+          : `Hey, I'm LanceBot for **${notebook.title}**. Ask for a summary, explanation, or practice question.`,
       }]);
     }
   }, [savedMessages, notebook]);

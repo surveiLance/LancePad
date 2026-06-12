@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import LanceBot from "./LanceBot";
 
 const QUIPS = [
-  "Hintay ka lang pre, kinukuha ko na lahat 📦",
-  "Loading... o baka nag-aayos lang ako ng buhok ko 💁",
-  "Sandali lang ha, promise mabilis to 😭",
-  "Uy wag kang aalis, andito na ako 👀",
-  "Bro... ako na bahala. Trust the process 🙏",
-  "Konting tiis lang pre, malapit na 💀",
-  "Nag-load na to dati mas mabilis... sus 😤",
-  "Ikaw ba yun? Teka, inaayos ko pa yung notebook mo 📚",
-  "Di ako nagpapahinga para dito ha. Walang pasasalamat. 😤",
-  "Almost done... charot, hindi pa. Pero malapit na fr 🙃",
+  "One sec, getting ready 📦",
+  "Loading... thinking too 💁",
+  "Sandali lang, this should be quick 😭",
+  "Uy, don't leave yet. I'm here 👀",
+  "Bro... I got this. Trust the process 🙏",
+  "Almost there. Tiny patience moment 💀",
+  "This loaded faster last time... suspicious 😤",
+  "Getting your notebook 📚",
+  "Working very hard. Obviously. 😤",
+  "Almost done. For real 🙃",
 ];
 
 function pick() { return QUIPS[Math.floor(Math.random() * QUIPS.length)]; }

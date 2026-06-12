@@ -9,100 +9,100 @@ import { subscribeNoteContent } from "@/lib/lancebot-store";
 
 const PAGE_QUIPS: Record<string, string[]> = {
   notebooks: [
-    "Uy, pumunta ka na dito! Mag-aral na tayo 📚",
-    "Bro is just staring at the screen 💀 sige na pre",
-    "Nako, ang tagal mo naman. Buksan mo na yung notebook.",
-    "Ay sus, ang dami mong notebooks pero di ka nag-aaral 😭",
-    "Lodi, ang future mo ay depende sa galaw mo ngayon. Charot. Pero totoo.",
-    "Pick a notebook and let's cook 🍳 kaya mo yan",
-    "Grabe ka talaga, andito na ako waiting for you 👀",
-    "Jusko, pag-aralan mo na bago ka magsisi sa exam 😭",
-    "Bet? Bet. Tara na, mag-aral tayo 🚀",
-    "Sige lang, manonood lang ako... pero mag-aral ka na ha.",
+    "Pick a notebook. Let's study 📚",
+    "Sige, open a notebook.",
+    "One notebook. Small start.",
+    "Study now, panic less later.",
+    "Future you says thanks.",
+    "Let's cook 🍳",
+    "I'm here 👀",
+    "Tiny step. Big payoff.",
+    "Tara, start one.",
+    "Those notebooks are waiting.",
   ],
   cards: [
-    "Generate mo na yung cards, andito na ako 👀",
-    "Flashcards? Solid choice. Retention goes brrr 🧠",
-    "Yung bawat card = isang concept na di mo malilimutan. Trust.",
-    "Uy, i-review mo na yung cards mo ha. Kaya mo yan 💪",
-    "Add mo na cards, para may ipag-aral tayo 📇",
-    "Ang ganda ng study method mo actually. Cards? Chef's kiss 🤌",
-    "Nabibilang ko yung cards mo. Dasig ka pa rin! 💜",
+    "Generate cards when ready 👀",
+    "Flashcards? Solid choice 🧠",
+    "One card, one concept.",
+    "Review a few. Kaya yan 💪",
+    "Add cards. Drill later 📇",
+    "Cards are a good move 🤌",
+    "Card count looks good.",
   ],
   quizzes: [
-    "Review mo yung past quizzes mo — doon mo makikita ang kalaban 👀",
-    "Yung wrong answers mo dati? That's the roadmap ngayon 🗺️",
-    "Uy, may quiz history ka na! Ibig sabihin nag-aral ka. Proud ako. 😤",
+    "Review past quizzes 👀",
+    "Wrong answers are clues 🗺️",
+    "Quiz history. Proud ako 😤",
     "Mistakes = free reviewers. Take notes literally.",
-    "Check mo yung scores mo. Improvement is brewing 📈",
-    "Quiz history check! Alam ko naman magaling ka na 💜",
+    "Check the scores 📈",
+    "See what needs another pass.",
   ],
   study: [
-    "Kaya mo yan lods!! 💜 Maniniwala ako sa'yo",
-    "Ay, mali. Pero okay lang, ganyan talaga 😅 next!",
-    "Nako, tama! Grabe ka talaga 🎉",
-    "Jusko, isipin mo mabuti bago sumagot ha 🤔",
-    "Hala, tama ka! Sana ganyan ka sa exam 🙏",
-    "Wrong answer? Character development yan pre 💪",
-    "I believe in you!! Charot. Hindi charot. Totoo. 💜",
-    "Take your time. Wala namang nagmamadali dito. Maliban sa exam mo.",
-    "Ay sus, kaya mo yan! Di mo lang alam.",
-    "Kung mali ka, okay lang. Natuto ka. Science yan.",
-    "Grabe ka, ang bilis mo! Feeling ko matalino ka.",
-    "Laban lods! Wag susuko 💪",
+    "One question at a time 💜",
+    "Think it through.",
+    "Make this one count 🎉",
+    "Read carefully 🤔",
+    "Practice now, easier later.",
+    "Wrong answer? Useful data.",
+    "I believe in you. Fr.",
+    "Take your time.",
+    "You know more than you think.",
+    "Wrong means we learn.",
+    "Fast is good. Accurate is better.",
+    "Laban 💪",
   ],
   tutor: [
-    "Tanong mo na, binasa ko na lahat ng notes mo 📖",
-    "Wala kang dumb question dito. Wala. Tanong mo na.",
-    "Grabe, trained talaga ako para dito 🎓 sa'yo lang to",
-    "Uy, i-explain ko ulit kung di mo gets. Walang judgement.",
-    "Di ako natutulog. Di ako kumakain. Nag-e-explain lang ako. Ibang level.",
-    "Stuck ka? Exactly yung reason kung bakit nandito ako 💜",
-    "Nabasa ko yung notes mo ng mas maraming beses pa sa'yo tbh.",
-    "I-type mo na yung tanong mo, kaya ko yan 😤",
-    "Yung tanong na nahihiya kang i-Google? Ako yung sagot dun.",
-    "Huwag kang mahiyang magtanong pre. Safe space dito 💜",
+    "Ask away. I read the notes 📖",
+    "No dumb questions here. Sige, send it.",
+    "Built for this moment 🎓",
+    "Still fuzzy? I can retry.",
+    "I explain. That's the job.",
+    "Stuck? I'm here 💜",
+    "I read the notes. Probably twice.",
+    "Send the question 😤",
+    "Ask the awkward question.",
+    "Safe study zone 💜",
   ],
 };
 
 const TYPING_QUIPS = {
   justStarted: [
-    "Uy, nag-start na! Let's gooo 📝",
-    "Grabe, nag-type na! I'm watching 👁️",
-    "Sige, i-dump mo lahat ng notes dito 📋",
+    "Uy, you started. Let's gooo 📝",
+    "Momentum. Nice 👁️",
+    "Sige, dump the notes 📋",
   ],
   short: [
-    "Dagdag pa! Di pa sapat yan para sa cards 😬",
-    "Medyo konti pa... kaya mo pa magdagdag 💪",
-    "Nako, need mo pang mag-add ng more notes pre",
+    "Add a bit more 😬",
+    "More detail helps 💪",
+    "A few more notes.",
   ],
   medium: [
-    "Okay na yan! I-generate mo na kung gusto mo 🃏",
-    "Grabe, ang dami na ng notes mo! Respect 🫡",
-    "Feeling ko marami kang matutunan dito 🧠",
+    "Enough to generate 🃏",
+    "Solid notes. Respect 🫡",
+    "Good material here 🧠",
   ],
   long: [
-    "JUSKO. Ang dami nang notes. Idol ka talaga 😭🙏",
-    "Pre, nagbabasa pa rin ako. Sandali lang 👁️💨",
-    "Ang husay mo mag-notes. Siguradong magagamit to.",
+    "Lots of notes. Respect 😭",
+    "Still reading. Sandali 👁️",
+    "Useful notes. Nice.",
   ],
   paused: [
-    "Bakit tumigil? Huwag kang susuko 💜",
-    "Thinking? Good. I'm thinking too. 🤔",
-    "Pag nakapag-generate ka na, proud na ako sa'yo 🫶",
-    "Ready ka na bang i-generate? Kaya na yan! ⚡",
-    "Take a breath. Then keep going 💪",
+    "Paused? All good 💜",
+    "Thinking is allowed 🤔",
+    "Generate when ready 🫶",
+    "Looks ready ⚡",
+    "Breathe. Continue 💪",
   ],
   keywords: [
-    { words: ["history", "kasaysayan", "historical"], quip: "Ay history! Fave ko yan. Let's go 📜" },
-    { words: ["math", "equation", "algebra", "calculus"], quip: "Math? I gotchu. Masakit pero kaya 🔢" },
-    { words: ["science", "biology", "chemistry", "physics"], quip: "Science notes! I will explain everything. Trust. 🔬" },
-    { words: ["english", "literature", "essay", "grammar"], quip: "English notes ha? I read, don't worry 📖" },
-    { words: ["law", "legal", "constitution", "rights"], quip: "Law? Legit. Complicated pero kaya natin 📃" },
-    { words: ["economics", "econ", "supply", "demand"], quip: "Economics? Supply and demand ng utak natin 🏦" },
-    { words: ["filipino", "pilipino", "tagalog", "wika"], quip: "Filipino subject? Eto na ang hintay ko 🇵🇭" },
-    { words: ["nursing", "medical", "anatomy", "health"], quip: "Medical notes! Future nurse/doc ka ba? SLAY 🩺" },
-    { words: ["programming", "code", "function", "algorithm"], quip: "Code notes? Pareho tayo. Built different 💻" },
+    { words: ["history", "kasaysayan", "historical"], quip: "History. Let's go 📜" },
+    { words: ["math", "equation", "algebra", "calculus"], quip: "Math? Kaya yan 🔢" },
+    { words: ["science", "biology", "chemistry", "physics"], quip: "Science notes 🔬" },
+    { words: ["english", "literature", "essay", "grammar"], quip: "English notes 📖" },
+    { words: ["law", "legal", "constitution", "rights"], quip: "Law. Legit 📃" },
+    { words: ["economics", "econ", "supply", "demand"], quip: "Economics time 🏦" },
+    { words: ["filipino", "pilipino", "tagalog", "wika"], quip: "Filipino subject 🇵🇭" },
+    { words: ["nursing", "medical", "anatomy", "health"], quip: "Medical notes 🩺" },
+    { words: ["programming", "code", "function", "algorithm"], quip: "Code notes 💻" },
   ],
 };
 
@@ -122,6 +122,10 @@ function getPlainText(tiptapJson: string): string {
 
 function pick(arr: string[]) {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function bubbleDuration(text: string) {
+  return Math.min(8500, Math.max(3500, text.length * 70));
 }
 
 export default function FloatingLanceBot() {
@@ -152,7 +156,7 @@ export default function FloatingLanceBot() {
   function showBubble(text: string) {
     if (mutedRef.current) return;
     setBubble(text);
-    setTimeout(() => setBubble(null), 5000);
+    setTimeout(() => setBubble(null), bubbleDuration(text));
   }
 
   function handleShutUp() {
