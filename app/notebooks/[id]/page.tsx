@@ -86,12 +86,6 @@ export default function NotebookPage() {
   const [buildMode, setBuildMode] = useState<BuildMode>("outline");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  function parseChoices(text: string): string[] | null {
-    const matches = [...text.matchAll(/\b([A-D])\)\s*([^\n\[A-D]+?)(?=\s+[A-D]\)|$)/g)];
-    if (matches.length < 2) return null;
-    return matches.map((m) => `${m[1]}) ${m[2].trim()}`);
-  }
-
   function handleNoteChange(content: string) {
     setNoteContent(content);
     pushNoteContent(content);
