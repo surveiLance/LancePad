@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import LanceBot from "./LanceBot";
 
 const QUIPS = [
-  "One sec, getting ready 📦",
-  "Loading... thinking too 💁",
-  "One moment. Almost there 😭",
-  "Uy, don't leave yet. I'm here 👀",
-  "I got this. Trust the process 🙏",
-  "Almost there. Tiny patience moment 💀",
-  "This loaded faster last time... suspicious 😤",
-  "Getting your notebook 📚",
-  "Working very hard. Obviously. 😤",
-  "Almost done. For real 🙃",
+  "One sec, unpacking the brain snacks 📦",
+  "Loading... I am pretending this is dramatic 💁",
+  "One moment. The tiny gears are doing cardio 😭",
+  "Uy, don't leave yet. I just got here 👀",
+  "I got this. Trust the questionable little robot 🙏",
+  "Almost there. Tiny patience side quest 💀",
+  "This loaded faster last time... suspicious behavior 😤",
+  "Fetching your notebook from the academic void 📚",
+  "Working very hard. Clipboard not included 😤",
+  "Almost done. For real this time 🙃",
 ];
 
 function pick() { return QUIPS[Math.floor(Math.random() * QUIPS.length)]; }

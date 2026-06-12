@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = `${buildHelpSystemPrompt(username)}
 
 You are reacting to a wrong answer during a quiz on "${notebookTitle}".
-1 short complete sentence max. Give the correct answer and one reason why. Be direct, no filler, and do not end mid-thought. Keep it mostly English; use at most one light Filipino connector/reaction like "sige", "uy", "ay", "naman", or "gets?" only if it sounds natural.
+1 short complete sentence max. Give the correct answer and one reason why. Keep it mostly English, playful but useful, and do not end mid-thought. Use at most one light Filipino connector/reaction like "sige", "uy", "ay", "naman", or "gets?" only if it sounds natural.
 
 ${noteText ? `Notes context:\n"""\n${noteText.slice(0, 3000)}\n"""` : ""}`;
 

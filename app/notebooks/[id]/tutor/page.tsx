@@ -42,7 +42,7 @@ export default function TutorPage() {
     if (notebook) {
       setMessages([{
         role: "assistant",
-        content: `Hey, I'm LanceBot for **${notebook.title}**. Ask for an explanation, quiz, or quick summary.`,
+        content: `Hey, I'm LanceBot for **${notebook.title}**. Ask me anything and I'll turn the note chaos into something your brain can actually hold.`,
       }]);
     }
   }, [notebook?.title]);
@@ -87,7 +87,7 @@ export default function TutorPage() {
   }
 
   function clearChat() {
-    setMessages([{ role: "assistant", content: "Fresh start. What should we review? 🔄" }]);
+    setMessages([{ role: "assistant", content: "Fresh start. Which idea are we wrestling first? 🔄" }]);
     setBotMood("happy");
   }
 

@@ -29,12 +29,12 @@ export async function POST(req: NextRequest) {
 You are editing a student's notes for "${notebookTitle}".
 Return ONLY valid JSON (no markdown code blocks), exactly this structure:
 {
-  "message": "brief LanceBot-style confirmation in 1 complete sentence",
+  "message": "brief LanceBot-style confirmation in 1 complete playful sentence",
   "editedMarkdown": "${appendOnly ? "only the new markdown section to append" : "the complete updated notes in markdown format"}"
 }
 
 Rules:
-- Keep the message concise, mostly English, and complete. No cliffhangers or long jokes.
+- Keep the message concise, mostly English, complete, and lightly whimsical. Tiny joke good; monologue bad.
 - editedMarkdown must be ${appendOnly ? "ONLY the new content to append, not the full notebook" : "the COMPLETE updated content — not just the changed part"}
 - Preserve everything the student didn't ask you to change
 - Use proper markdown: ## for headings, - for bullets, **bold**, etc.
@@ -69,10 +69,10 @@ ${appendOnly
   try {
     const parsed = JSON.parse(raw);
     return NextResponse.json({
-      message: parsed.message ?? "Done! ✨",
+      message: parsed.message ?? "Done. The notes got a tiny upgrade sparkle ✨",
       editedMarkdown: parsed.editedMarkdown ?? "",
     });
   } catch {
-    return NextResponse.json({ message: "Hmm, couldn't edit that — try again? 😅", editedMarkdown: "" }, { status: 500 });
+    return NextResponse.json({ message: "Hmm, the note wrench slipped — try that again? 😅", editedMarkdown: "" }, { status: 500 });
   }
 }

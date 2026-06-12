@@ -135,7 +135,7 @@ export default function NotebookPage() {
     } else {
       setMessages([{
         role: "assistant",
-        content: `Hey, I'm LanceBot for **${notebook.title}**. Ask for a summary, explanation, or practice question.`,
+        content: `Hey, I'm LanceBot for **${notebook.title}**. Drop me a question and I'll untangle the notes without making it feel like a tax form.`,
       }]);
     }
   }, [savedMessages, notebook]);
@@ -270,7 +270,7 @@ export default function NotebookPage() {
         });
         const { message: botMsg, editedMarkdown } = await res.json();
         if (!editedMarkdown) {
-          const failMsg = "I couldn't create note changes for that. Try naming the section or topic more directly.";
+          const failMsg = "I couldn't shape that into notes yet. Give me a clearer topic and I'll try again, tiny hammer ready.";
           setMessages([...newMessages, { role: "assistant", content: failMsg }]);
           await addMessage({ notebookId, role: "assistant", content: failMsg });
           setBotMood("sad");
@@ -591,7 +591,7 @@ export default function NotebookPage() {
             <button
               onClick={async () => {
                 await clearMessages({ notebookId });
-                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?" }]);
+                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What are we poking with the study stick?" }]);
                 setBotMood("happy");
               }}
               className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"

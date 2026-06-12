@@ -74,7 +74,7 @@ export default function NotebooksPage() {
 
   useEffect(() => {
     if (!welcomed && isAuthenticated && username) {
-      setBubble(`Welcome, ${username}. Tara, study time 📚`);
+      setBubble(`Welcome, ${username}. Tara, let's wake up the brain shelves 📚`);
       setWelcomed(true);
       return;
     }
@@ -83,19 +83,19 @@ export default function NotebooksPage() {
     const upcoming = upcomingTasks.filter((t) => t.date !== todayStr && !t.completed);
 
     const quips = pending.length > 0 ? [
-      `${pending.length} task${pending.length === 1 ? "" : "s"} left today 👀`,
-      `${pending[0]?.title}? Still pending 💪`,
-      `Don't forget today's tasks 📅`,
+      `${pending.length} task${pending.length === 1 ? "" : "s"} left today. The checklist is staring 👀`,
+      `${pending[0]?.title}? Still pending, still beatable 💪`,
+      `Today's tasks are tapping the glass 📅`,
     ] : upcoming.length > 0 ? [
-      `${upcoming.length} upcoming task${upcoming.length === 1 ? "" : "s"} 📅`,
-      `Upcoming tasks. Start early 📚`,
-      `Busy schedule. Kaya yan 💪`,
+      `${upcoming.length} upcoming task${upcoming.length === 1 ? "" : "s"}. Calendar lore unlocked 📅`,
+      `Upcoming tasks. Start early, dodge panic 📚`,
+      `Busy schedule. Kaya yan, one tiny mission at a time 💪`,
     ] : [
-      `Pick a notebook 📚`,
-      `Sige, start small.`,
-      "No tasks. Good time to study 😌",
-      "Add calendar tasks if needed 📅",
-      "Tara, one session 🚀",
+      `Pick a notebook. The knowledge vault awaits 📚`,
+      `Sige, start small. Tiny wins are still wins.`,
+      "No tasks. Suspiciously peaceful study window 😌",
+      "Add calendar tasks if needed. Future-you likes receipts 📅",
+      "Tara, one session. Low pressure, high brain yield 🚀",
     ];
 
     const show = () => setBubble(quips[Math.floor(Math.random() * quips.length)]);

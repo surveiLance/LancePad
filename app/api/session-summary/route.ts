@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 ${correct.length} correct out of ${results.length} total.
 Missed: ${incorrect.map((r: { question: string }) => r.question).join(", ") || "none"}
 
-Give a 2-sentence session summary as LanceBot. Keep it concise, direct, complete, and specific about what to review. Plain text only.`;
+Give a 2-sentence session summary as LanceBot. Keep it concise, specific about what to review, and lightly funny or whimsical. Plain text only.`;
 
   try {
     const completion = await groq.chat.completions.create({
