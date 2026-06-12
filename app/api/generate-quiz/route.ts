@@ -6,6 +6,13 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+type QuizQuestion = {
+  question: string;
+  answer: string;
+  type: string;
+  options?: string[];
+};
+
 function extractText(tiptapJson: string): string {
   try {
     const doc = JSON.parse(tiptapJson);
@@ -18,6 +25,140 @@ function extractText(tiptapJson: string): string {
   } catch {
     return tiptapJson;
   }
+}
+
+function normalizeChoice(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\b(a|an|the)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenSet(value: string): Set<string> {
+  return new Set(normalizeChoice(value).split(" ").filter(Boolean));
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const aTokens = tokenSet(a);
+  const bTokens = tokenSet(b);
+  if (!aTokens.size || !bTokens.size) return 0;
+
+  let intersection = 0;
+  for (const token of aTokens) {
+    if (bTokens.has(token)) intersection += 1;
+  }
+
+  return intersection / (aTokens.size + bTokens.size - intersection);
+}
+
+function choicesAreTooSimilar(a: string, b: string): boolean {
+  const normalizedA = normalizeChoice(a);
+  const normalizedB = normalizeChoice(b);
+  if (!normalizedA || !normalizedB) return true;
+  if (normalizedA === normalizedB) return true;
+  if (normalizedA.length > 8 && normalizedB.length > 8) {
+    if (normalizedA.includes(normalizedB) || normalizedB.includes(normalizedA)) return true;
+  }
+  return jaccardSimilarity(a, b) >= 0.82;
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function dedupeChoices(choices: string[]): string[] {
+  return choices.reduce<string[]>((unique, choice) => {
+    const trimmed = choice.trim();
+    if (!trimmed) return unique;
+    if (unique.some((existing) => choicesAreTooSimilar(existing, trimmed))) return unique;
+    return [...unique, trimmed];
+  }, []);
+}
+
+function normalizeMultipleChoiceQuestion(question: QuizQuestion, fallbackAnswers: string[]): QuizQuestion | null {
+  const answer = question.answer?.trim();
+  const prompt = question.question?.trim();
+  if (!prompt || !answer) return null;
+
+  const modelOptions = Array.isArray(question.options) ? question.options : [];
+  const distractors = dedupeChoices(modelOptions)
+    .filter((option) => !choicesAreTooSimilar(option, answer))
+    .slice(0, 3);
+
+  const extraDistractors = fallbackAnswers
+    .filter((candidate) => !choicesAreTooSimilar(candidate, answer))
+    .filter((candidate) => !distractors.some((option) => choicesAreTooSimilar(option, candidate)));
+
+  const options = dedupeChoices([answer, ...distractors, ...extraDistractors]).slice(0, 4);
+  if (options.length < 2 || !options.some((option) => choicesAreTooSimilar(option, answer))) return null;
+
+  return {
+    ...question,
+    question: prompt,
+    answer,
+    type: "multiple_choice",
+    options: shuffle(options),
+  };
+}
+
+function rebalanceAnswerPositions(questions: QuizQuestion[]): QuizQuestion[] {
+  let previousAnswerIndex = -1;
+  let streak = 0;
+
+  return questions.map((question) => {
+    if (question.type !== "multiple_choice" || !question.options?.length) return question;
+
+    const answerIndex = question.options.findIndex((option) => choicesAreTooSimilar(option, question.answer));
+    if (answerIndex === -1) return question;
+
+    if (answerIndex === previousAnswerIndex) {
+      streak += 1;
+    } else {
+      previousAnswerIndex = answerIndex;
+      streak = 1;
+    }
+
+    if (streak < 3 || question.options.length < 2) return question;
+
+    const options = [...question.options];
+    const targetIndex = options.findIndex((_, index) => index !== answerIndex && index !== previousAnswerIndex);
+    if (targetIndex === -1) return question;
+
+    [options[answerIndex], options[targetIndex]] = [options[targetIndex], options[answerIndex]];
+    previousAnswerIndex = targetIndex;
+    streak = 1;
+
+    return { ...question, options };
+  });
+}
+
+function sanitizeQuestions(questions: QuizQuestion[]): QuizQuestion[] {
+  const fallbackAnswers = questions
+    .map((question) => question.answer?.trim())
+    .filter((answer): answer is string => Boolean(answer));
+
+  const sanitized = questions
+    .map((question) => {
+      if (question.type !== "multiple_choice") {
+        return {
+          ...question,
+          question: question.question?.trim(),
+          answer: question.answer?.trim(),
+        };
+      }
+
+      return normalizeMultipleChoiceQuestion(question, fallbackAnswers);
+    })
+    .filter((question): question is QuizQuestion => Boolean(question?.question && question.answer));
+
+  return rebalanceAnswerPositions(sanitized);
 }
 
 function buildPrompt(plainText: string, notebookTitle: string, mode: string, quizType?: string): string {
@@ -62,6 +203,8 @@ ${plainText}
 Generate exactly 10 multiple choice questions as JSON. Each question has 4 options, one correct answer.
 All 4 options must be plausible and related to the topic — no obviously wrong distractors.
 The correct answer must come directly from the notes.
+Each distractor must be clearly different from the correct answer and from the other distractors. Do not use reworded versions, synonyms, overlapping phrases, or choices where more than one could reasonably be correct.
+Randomize the correct answer position independently for each question. Do not put the correct answer in the same letter position repeatedly.
 
 Return ONLY valid JSON array, no markdown, no code blocks:
 [
@@ -187,12 +330,17 @@ export async function POST(req: NextRequest) {
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
 
-  let questions: { question: string; answer: string; type: string; options?: string[] }[];
+  let questions: QuizQuestion[];
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     questions = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
   } catch {
     return NextResponse.json({ error: "parse_error" }, { status: 500 });
+  }
+
+  questions = sanitizeQuestions(questions);
+  if (!questions.length) {
+    return NextResponse.json({ error: "no_valid_questions" }, { status: 500 });
   }
 
   if (mode === "quiz") {
