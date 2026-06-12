@@ -171,8 +171,8 @@ export default function NoteEditor({ content, onChange, isPreview = false }: Not
       />
 
       {/* Editor */}
-      <div className={cn("flex-1 overflow-y-auto px-5 py-4 transition-opacity duration-300", isPreview ? "opacity-40 pointer-events-none select-none" : "opacity-100")}>
-        <div className="tiptap-editor max-w-2xl mx-auto">
+      <div className={cn("flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 transition-opacity duration-300", isPreview ? "opacity-40 pointer-events-none select-none" : "opacity-100")}>
+        <div className="tiptap-editor w-full max-w-5xl mx-auto">
           <EditorContent editor={editor} />
         </div>
       </div>

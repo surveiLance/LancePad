@@ -14,7 +14,7 @@ const PAGE_QUIPS: Record<string, string[]> = {
     "One notebook. Small start.",
     "Study now, panic less later.",
     "Future you says thanks.",
-    "Let's cook 🍳",
+    "Let's study 📚",
     "I'm here 👀",
     "Tiny step. Big payoff.",
     "Tara, start one.",
@@ -32,7 +32,7 @@ const PAGE_QUIPS: Record<string, string[]> = {
   quizzes: [
     "Review past quizzes 👀",
     "Wrong answers are clues 🗺️",
-    "Quiz history. Proud ako 😤",
+    "Quiz history. Nice work 😤",
     "Mistakes = free reviewers. Take notes literally.",
     "Check the scores 📈",
     "See what needs another pass.",
@@ -83,7 +83,7 @@ const TYPING_QUIPS = {
   ],
   long: [
     "Lots of notes. Respect 😭",
-    "Still reading. Sandali 👁️",
+    "Still reading 👁️",
     "Useful notes. Nice.",
   ],
   paused: [

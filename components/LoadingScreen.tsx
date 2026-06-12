@@ -6,9 +6,9 @@ import LanceBot from "./LanceBot";
 const QUIPS = [
   "One sec, getting ready 📦",
   "Loading... thinking too 💁",
-  "Sandali lang, this should be quick 😭",
+  "One moment. Almost there 😭",
   "Uy, don't leave yet. I'm here 👀",
-  "Bro... I got this. Trust the process 🙏",
+  "I got this. Trust the process 🙏",
   "Almost there. Tiny patience moment 💀",
   "This loaded faster last time... suspicious 😤",
   "Getting your notebook 📚",

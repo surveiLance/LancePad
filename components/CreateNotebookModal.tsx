@@ -11,7 +11,7 @@ interface Folder { _id: Id<"folders">; name: string; emoji: string; color: strin
 
 interface CreateNotebookModalProps {
   onClose: () => void;
-  onCreate: (title: string, color: string, emoji: string, folderId?: Id<"folders">, type?: "notebook" | "assignment") => Promise<void>;
+  onCreate: (title: string, color: string, emoji: string, folderId?: Id<"folders">) => Promise<void>;
   folders?: Folder[];
   defaultFolderId?: Id<"folders">;
 }
@@ -21,14 +21,13 @@ export default function CreateNotebookModal({ onClose, onCreate, folders = [], d
   const [color, setColor] = useState(randomFrom(NOTEBOOK_COLORS));
   const [emoji, setEmoji] = useState(randomFrom(NOTEBOOK_EMOJIS));
   const [folderId, setFolderId] = useState<Id<"folders"> | undefined>(defaultFolderId);
-  const [type, setType] = useState<"notebook" | "assignment">("notebook");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     setLoading(true);
-    await onCreate(title.trim(), color, emoji, folderId, type);
+    await onCreate(title.trim(), color, emoji, folderId);
     onClose();
   }
 
@@ -43,29 +42,6 @@ export default function CreateNotebookModal({ onClose, onCreate, folders = [], d
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Type picker */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-800 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setType("notebook")}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${type === "notebook" ? "bg-gray-900 text-white shadow" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              📚 Notebook
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("assignment")}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${type === "assignment" ? "bg-gray-900 text-white shadow" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              📋 Assignment
-            </button>
-          </div>
-          {type === "assignment" && (
-            <p className="text-xs text-purple-400 bg-purple-950/30 border border-purple-900/40 rounded-xl px-3 py-2">
-              Assignment mode — LanceBot helps you complete your work, not just study it. Paste your requirements and it&apos;ll structure and draft with you.
-            </p>
-          )}
-
           {/* Title */}
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2 block">
@@ -150,8 +126,7 @@ export default function CreateNotebookModal({ onClose, onCreate, folders = [], d
             <div className="p-4 flex items-center gap-3">
               <span className="text-2xl">{emoji}</span>
               <div>
-                <span className="font-semibold text-white">{title || (type === "assignment" ? "Assignment title" : "Notebook title")}</span>
-                {type === "assignment" && <p className="text-xs text-purple-400 mt-0.5">Assignment</p>}
+                <span className="font-semibold text-white">{title || "Notebook title"}</span>
               </div>
             </div>
           </div>
@@ -161,7 +136,7 @@ export default function CreateNotebookModal({ onClose, onCreate, folders = [], d
               Cancel
             </Button>
             <Button type="submit" className="flex-1" disabled={loading || !title.trim()}>
-              {loading ? "Creating..." : type === "assignment" ? "Create Assignment" : "Create Notebook"}
+              {loading ? "Creating..." : "Create Notebook"}
             </Button>
           </div>
         </form>

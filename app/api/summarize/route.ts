@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     messages: [
       {
         role: "system",
-        content: `${buildHelpSystemPrompt(username)}\n\nYou are summarizing a student's notes for "${notebookTitle}". Return ONLY valid JSON: {"summary": "the summary in markdown format with headings and bullets"}`,
+        content: `${buildHelpSystemPrompt(username)}\n\nYou are summarizing a student's notes for "${notebookTitle}". Use the same concise LanceBot voice: mostly English, direct, complete thoughts. Return ONLY valid JSON: {"summary": "a concise markdown summary with headings and bullets"}`,
       },
       {
         role: "user",

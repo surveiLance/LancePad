@@ -31,18 +31,19 @@ const QUIZ_TYPES = [
   { type: "fill_blank",      label: "Fill in the Blank", desc: "Complete the missing word",   icon: "📝" },
 ];
 
-const ASSIGNMENT_PROMPTS = [
-  "Draft an introduction",
-  "What's missing based on requirements?",
-  "Expand this section",
-  "Polish the writing",
-];
-
 const STARTER_PROMPTS = [
   "Quick summary of key points",
   "Quiz me on what I should know",
   "Explain this like I'm 5",
   "What are connections between main concepts?",
+];
+
+type BuildMode = "outline" | "add" | "continue";
+
+const BUILD_MODES: { mode: BuildMode; label: string }[] = [
+  { mode: "outline", label: "Outline" },
+  { mode: "add", label: "Add info" },
+  { mode: "continue", label: "Continue" },
 ];
 
 export default function NotebookPage() {
@@ -82,6 +83,7 @@ export default function NotebookPage() {
   const [tasksOpen, setTasksOpen] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [outlineTopic, setOutlineTopic] = useState("");
+  const [buildMode, setBuildMode] = useState<BuildMode>("outline");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function parseChoices(text: string): string[] | null {
@@ -108,6 +110,15 @@ export default function NotebookPage() {
     }
   }
 
+  function appendTiptapContent(baseJson: string, additionJson: string): string {
+    const base = baseJson ? JSON.parse(baseJson) : { type: "doc", content: [] };
+    const addition = JSON.parse(additionJson);
+    return JSON.stringify({
+      type: "doc",
+      content: [...(base.content ?? []), ...(addition.content ?? [])],
+    });
+  }
+
   const noteLoaded = useRef(false);
   useEffect(() => {
     if (note?.content !== undefined && !noteLoaded.current) {
@@ -128,12 +139,9 @@ export default function NotebookPage() {
     if (savedMessages.length > 0) {
       setMessages(savedMessages.map((m) => ({ role: m.role, content: m.content })));
     } else {
-      const isAssignment = notebook.type === "assignment";
       setMessages([{
         role: "assistant",
-        content: isAssignment
-          ? `Hey, I'm LanceBot for **${notebook.title}**. Paste the requirements or tell me what needs to happen.`
-          : `Hey, I'm LanceBot for **${notebook.title}**. Ask for a summary, explanation, or practice question.`,
+        content: `Hey, I'm LanceBot for **${notebook.title}**. Ask for a summary, explanation, or practice question.`,
       }]);
     }
   }, [savedMessages, notebook]);
@@ -191,12 +199,13 @@ export default function NotebookPage() {
     const lower = msg.toLowerCase();
     // Edit / modify existing notes
     const noteRef = lower.includes("my notes") || lower.includes("the notes") || lower.includes("my note");
-    const editVerbs = ["edit", "fix", "clean", "organize", "rewrite", "update", "modify", "improve", "format", "restructure", "add", "remove", "delete", "expand", "shorten", "simplify", "convert", "revamp", "change"];
+    const editVerbs = ["edit", "fix", "clean", "organize", "rewrite", "update", "modify", "improve", "format", "restructure", "add", "remove", "delete", "expand", "shorten", "simplify", "convert", "revamp", "change", "continue", "extend"];
     if (noteRef && editVerbs.some((v) => lower.includes(v))) return true;
     // Create / start notes from scratch
-    const createVerbs = ["start", "create", "make", "generate", "write", "draft", "build", "give me"];
-    const targets = ["outline", "notes", "note", "study guide", "template", "structure", "summary"];
+    const createVerbs = ["start", "create", "make", "generate", "write", "draft", "build", "give me", "continue", "extend"];
+    const targets = ["outline", "notes", "note", "study guide", "template", "structure", "summary", "table", "section", "concept"];
     if (createVerbs.some((v) => lower.includes(v)) && targets.some((t) => lower.includes(t))) return true;
+    if (/\boutline\s+(for|about|on)\b/.test(lower)) return true;
     return false;
   }
 
@@ -233,15 +242,14 @@ export default function NotebookPage() {
 
   function handleUndoEdit(idx: number) {
     if (undoContent === null) return;
-    const applied = noteContent;
     handleNoteChange(undoContent);
     handleSave(undoContent);
-    setPendingEditTiptap(applied);
+    setPendingEditTiptap(null);
     setUndoContent(null);
-    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "pending_edit" } : m));
+    setMessages((prev) => prev.map((m, i) => i === idx ? { ...m, action: "reverted_edit" } : m));
   }
 
-  async function sendMessage(text?: string) {
+  async function sendMessage(text?: string, options?: { autoApplyEdit?: boolean; appendOnly?: boolean }) {
     const content = (text ?? input).trim();
     if (!content || chatLoading) return;
     const newMessages: ChatMessage[] = [...messages, { role: "user", content }];
@@ -258,9 +266,27 @@ export default function NotebookPage() {
         const res = await fetch("/api/lancebot-edit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instruction: content, noteContent, notebookTitle: notebook?.title, username, notebookType: notebook?.type }),
+          body: JSON.stringify({
+            instruction: content,
+            noteContent,
+            notebookTitle: notebook?.title,
+            username,
+            editMode: options?.appendOnly ? "append" : "replace",
+          }),
         });
         const { message: botMsg, editedMarkdown } = await res.json();
+        if (!editedMarkdown) {
+          const failMsg = "I couldn't create note changes for that. Try naming the section or topic more directly.";
+          setMessages([...newMessages, { role: "assistant", content: failMsg }]);
+          await addMessage({ notebookId, role: "assistant", content: failMsg });
+          setBotMood("sad");
+          return;
+        }
+
+        const generatedTiptap = JSON.stringify(markdownToTiptap(editedMarkdown));
+        const nextTiptap = options?.appendOnly
+          ? appendTiptapContent(noteContent, generatedTiptap)
+          : generatedTiptap;
         setBotMood("happy");
         // Type out word by word
         const words = botMsg.split(" ");
@@ -272,11 +298,20 @@ export default function NotebookPage() {
             if (i >= words.length) { clearInterval(tick); resolve(); }
           }, 55);
         });
-        // Reveal action buttons only after typing finishes
-        if (editedMarkdown) {
-          setPendingEditTiptap(JSON.stringify(markdownToTiptap(editedMarkdown)));
+
+        if (options?.autoApplyEdit) {
+          setUndoContent(noteContent);
+          handleNoteChange(nextTiptap);
+          handleSave(nextTiptap);
+          setPendingEditTiptap(null);
+          setMessages([...newMessages, { role: "assistant", content: botMsg, action: "undo_edit" }]);
+          await addMessage({ notebookId, role: "assistant", content: botMsg });
+          return;
         }
-        setMessages([...newMessages, { role: "assistant", content: botMsg, action: editedMarkdown ? "pending_edit" : undefined }]);
+
+        // Reveal action buttons only after typing finishes
+        setPendingEditTiptap(nextTiptap);
+        setMessages([...newMessages, { role: "assistant", content: botMsg, action: "pending_edit" }]);
         await addMessage({ notebookId, role: "assistant", content: botMsg });
       } catch {
         setMessages([...newMessages, { role: "assistant", content: "Oof, couldn't edit that 😅 Try again?" }]);
@@ -291,7 +326,7 @@ export default function NotebookPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username, notebookType: notebook?.type }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
       });
       if (!res.body) throw new Error("No stream");
       setGroqUsage({
@@ -323,6 +358,31 @@ export default function NotebookPage() {
   if (notebook === undefined) return <LoadingScreen />;
 
   if (notebook === null) return null;
+
+  const buildCopy = {
+    outline: {
+      placeholder: "Topic, chapter, or lesson",
+      button: "Create outline",
+    },
+    add: {
+      placeholder: "Topic, term, table, or detail to add",
+      button: "Add to notes",
+    },
+    continue: {
+      placeholder: "Section or concept to continue",
+      button: "Continue notes",
+    },
+  }[buildMode];
+
+  const buildInstruction = (request: string) => {
+    if (buildMode === "outline") {
+      return `Create a structured study outline for "${request}". Make it stand alone if the notebook is empty. Use headings, key subtopics, important terms, examples where helpful, and quick review questions. Append only this new outline section to the bottom of my notes.`;
+    }
+    if (buildMode === "continue") {
+      return `Continue or expand the existing notes for "${request}". Add the next useful subsection or supporting details as a new section at the bottom. Do not repeat my current notes.`;
+    }
+    return `Add more information to my notes about "${request}". Make a useful add-on section with clear bullets, examples, or a small table if it helps. Append only the new material at the bottom.`;
+  };
 
   return (
     <div className="h-screen bg-gray-950 flex flex-col overflow-hidden fade-slide-up">
@@ -412,7 +472,7 @@ export default function NotebookPage() {
       <div className="flex-1 flex min-h-0">
 
         {/* Left — Notes */}
-        <div className={cn("flex-1 flex-col min-h-0 border-r border-gray-800/60 p-4 gap-3 relative", "md:flex", mobileTab === "notes" ? "flex" : "hidden")}>
+        <div className={cn("flex-1 flex-col min-h-0 border-r border-gray-800/60 p-3 gap-3 relative", "md:flex", mobileTab === "notes" ? "flex" : "hidden")}>
           <div className="flex-shrink-0 grid grid-cols-3 gap-2">
             <button
               onClick={() => setShowImport(true)}
@@ -507,76 +567,37 @@ export default function NotebookPage() {
           </div>
 
           {/* LanceBot ambient presence */}
-          <div className="absolute bottom-6 left-6 flex flex-col items-start gap-2 pointer-events-none">
-            {noteContent.length < 10 && (
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-400 max-w-[160px] leading-relaxed shadow-lg bounce-in">
-                Start typing your notes — I'll help you study! ✏️
-              </div>
-            )}
-            <LanceBot
-              mood={generating ? "thinking" : noteContent.length > 50 ? "happy" : "idle"}
-              size={52}
-              animate
-            />
-          </div>
+          {(noteContent.length < 10 || generating) && (
+            <div className="absolute bottom-5 left-5 flex flex-col items-start gap-2 pointer-events-none">
+              {noteContent.length < 10 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-400 max-w-[160px] leading-relaxed shadow-lg bounce-in">
+                  Start typing your notes — I'll help you study! ✏️
+                </div>
+              )}
+              <LanceBot
+                mood={generating ? "thinking" : "idle"}
+                size={52}
+                animate
+              />
+            </div>
+          )}
         </div>
 
         {/* Right — LanceBot chat */}
         <div className={cn("w-full md:w-80 xl:w-96 flex-col min-h-0 bg-gray-950", "md:flex", mobileTab === "chat" ? "flex" : "hidden")}>
-          {/* Outline quick-start — always visible */}
-          <div className="border-b border-gray-800/60 px-3 py-2 flex-shrink-0">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!outlineTopic.trim() || chatLoading) return;
-                const msg = notebook.type === "assignment"
-                  ? `Here are my assignment requirements:\n\n${outlineTopic.trim()}\n\nAsk me your first question. No intro — just the question.`
-                  : `Start an outline for ${outlineTopic.trim()}`;
-                sendMessage(msg);
-                setOutlineTopic("");
-              }}
-              className="flex gap-2"
-            >
-              {notebook.type === "assignment" ? (
-                <textarea
-                  value={outlineTopic}
-                  onChange={(e) => setOutlineTopic(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
-                  placeholder="Paste assignment requirements or brief..."
-                  rows={2}
-                  className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors resize-none"
-                />
-              ) : (
-                <input
-                  value={outlineTopic}
-                  onChange={(e) => setOutlineTopic(e.target.value)}
-                  placeholder="Start outline for..."
-                  className="flex-1 bg-gray-900 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none transition-colors"
-                />
-              )}
-              <button
-                type="submit"
-                disabled={!outlineTopic.trim() || chatLoading}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors self-end"
-              >
-                {notebook.type === "assignment" ? "Analyze" : "Go"}
-              </button>
-            </form>
-          </div>
-
           {/* Bot header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800/60 flex-shrink-0">
             <LanceBot mood={botMood} size={42} animate={botMood === "thinking"} />
             <div className="flex-1 min-w-0">
               <p className="text-white font-semibold text-sm">LanceBot</p>
               <p className="text-gray-500 text-xs truncate">
-                {chatLoading ? "typing..." : `${notebook.type === "assignment" ? "assistant" : "tutor"} · ${notebook.emoji} ${notebook.title}`}
+                {chatLoading ? "typing..." : `tutor · ${notebook.emoji} ${notebook.title}`}
               </p>
             </div>
             <button
               onClick={async () => {
                 await clearMessages({ notebookId });
-                setMessages([{ role: "assistant", content: notebook.type === "assignment" ? "Fresh start! 🔄 Paste your requirements above or tell me what you need help with." : "Fresh start! 🔄 What do you want to go over?" }]);
+                setMessages([{ role: "assistant", content: "Fresh start! 🔄 What do you want to go over?" }]);
                 setBotMood("happy");
               }}
               className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
@@ -584,6 +605,60 @@ export default function NotebookPage() {
             >
               <RotateCcw size={14} />
             </button>
+          </div>
+
+          {/* Notes builder */}
+          <div className="border-b border-gray-800/60 px-3 py-3 flex-shrink-0 bg-gray-950">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!outlineTopic.trim() || chatLoading) return;
+                const request = outlineTopic.trim();
+                const msg = buildInstruction(request);
+                sendMessage(msg, { autoApplyEdit: true, appendOnly: true });
+                setOutlineTopic("");
+              }}
+              className="rounded-xl border border-purple-900/50 bg-purple-950/20 p-3 space-y-2"
+            >
+              <div className="flex items-center gap-2 text-purple-200">
+                <FileText size={14} />
+                <span className="text-xs font-semibold">
+                  Build notes
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1 rounded-lg bg-gray-950/70 border border-gray-800 p-1">
+                {BUILD_MODES.map((item) => (
+                  <button
+                    key={item.mode}
+                    type="button"
+                    onClick={() => setBuildMode(item.mode)}
+                    className={cn(
+                      "px-2 py-1.5 rounded-md text-[11px] font-semibold transition-colors",
+                      buildMode === item.mode
+                        ? "bg-purple-600 text-white"
+                        : "text-gray-400 hover:text-white hover:bg-gray-900",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={outlineTopic}
+                onChange={(e) => setOutlineTopic(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+                placeholder={buildCopy.placeholder}
+                rows={2}
+                className="w-full bg-gray-950/70 border border-gray-800 focus:border-purple-500/60 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none transition-colors resize-none"
+              />
+              <button
+                type="submit"
+                disabled={!outlineTopic.trim() || chatLoading}
+                className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                {buildCopy.button}
+              </button>
+            </form>
           </div>
 
           {/* Messages */}
@@ -613,14 +688,14 @@ export default function NotebookPage() {
                         className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 bg-green-950/40 hover:bg-green-900/40 border border-green-800/50 px-2.5 py-1 rounded-full transition-colors"
                       >
                         <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Replace notes
+                        Replace all notes
                       </button>
                       <button
                         onClick={() => handleAppendEdit(i)}
                         className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-800/50 px-2.5 py-1 rounded-full transition-colors"
                       >
                         <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                        Add to notes
+                        Append to bottom
                       </button>
                       <button
                         onClick={() => handleRejectEdit(i)}
@@ -640,23 +715,11 @@ export default function NotebookPage() {
                       Undo
                     </button>
                   )}
-                  {msg.role === "assistant" && i === messages.length - 1 && !chatLoading && notebook?.type === "assignment" && (() => {
-                    const choices = parseChoices(msg.content);
-                    if (!choices) return null;
-                    return (
-                      <div className="flex flex-wrap gap-1.5">
-                        {choices.map((choice) => (
-                          <button
-                            key={choice}
-                            onClick={() => sendMessage(choice)}
-                            className="text-xs text-purple-300 bg-purple-950/50 border border-purple-800/60 hover:bg-purple-900/50 hover:border-purple-700 px-2.5 py-1 rounded-full transition-colors"
-                          >
-                            {choice}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  {msg.action === "reverted_edit" && (
+                    <span className="self-start text-xs text-gray-500 bg-gray-900 border border-gray-800 px-2.5 py-1 rounded-full">
+                      Reverted
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -666,7 +729,7 @@ export default function NotebookPage() {
           {/* Starter prompts */}
           {messages.length <= 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5 flex-shrink-0">
-              {(notebook.type === "assignment" ? ASSIGNMENT_PROMPTS : STARTER_PROMPTS).map((p) => (
+              {STARTER_PROMPTS.map((p) => (
                 <button
                   key={p}
                   onClick={() => sendMessage(p)}

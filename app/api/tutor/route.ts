@@ -3,7 +3,7 @@ import Groq from "groq-sdk";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { buildTutorSystemPrompt, buildAssistantSystemPrompt } from "@/lib/lancebot";
+import { buildTutorSystemPrompt } from "@/lib/lancebot";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -22,7 +22,7 @@ function extractText(tiptapJson: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, notebookId, notebookTitle, username, notebookType } = await req.json();
+  const { messages, notebookId, notebookTitle, username } = await req.json();
 
   const note = await fetchQuery(
     api.notes.getByNotebook,
@@ -30,9 +30,7 @@ export async function POST(req: NextRequest) {
   );
 
   const noteText = note?.content ? extractText(note.content) : "";
-  const systemPrompt = notebookType === "assignment"
-    ? buildAssistantSystemPrompt(notebookTitle, noteText, username)
-    : buildTutorSystemPrompt(notebookTitle, noteText, username);
+  const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText, username);
 
   const history = messages.slice(-6).map((m: { role: string; content: string }) => ({
     role: m.role as "user" | "assistant",
@@ -40,10 +38,10 @@ export async function POST(req: NextRequest) {
   }));
 
   const { data: stream, response: groqResponse } = await groq.chat.completions.create({
-    model: notebookType === "assignment" ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant",
+    model: "llama-3.1-8b-instant",
     messages: [{ role: "system", content: systemPrompt }, ...history],
     temperature: 0.7,
-    max_tokens: notebookType === "assignment" ? 512 : 800,
+    max_tokens: 800,
     stream: true,
   }).withResponse();
 

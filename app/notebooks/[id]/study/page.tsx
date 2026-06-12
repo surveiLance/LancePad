@@ -314,7 +314,7 @@ export default function StudyPage() {
         <div className="max-w-lg w-full text-center">
           <LanceBot mood={mood} size={80} className="mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-white mb-1">
-            {pct >= 80 ? "Absolutely cooked 🔥" : pct >= 50 ? "Decent run 👍" : "We'll get there 💪"}
+            {pct >= 80 ? "Great run 🔥" : pct >= 50 ? "Decent run 👍" : "We'll get there 💪"}
           </h1>
           <p className="text-gray-400 mb-6">{correctCount} / {results.length} correct ({pct}%)</p>
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-left mb-6">

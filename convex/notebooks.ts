@@ -28,9 +28,8 @@ export const create = mutation({
     color: v.string(),
     emoji: v.string(),
     folderId: v.optional(v.id("folders")),
-    type: v.optional(v.union(v.literal("notebook"), v.literal("assignment"))),
   },
-  handler: async (ctx, { title, color, emoji, folderId, type }) => {
+  handler: async (ctx, { title, color, emoji, folderId }) => {
     const userId = await getAuthUserId(ctx);
     const notebookId = await ctx.db.insert("notebooks", {
       userId: userId ?? undefined,
@@ -38,7 +37,7 @@ export const create = mutation({
       title,
       color,
       emoji,
-      type,
+      type: "notebook",
     });
     await ctx.db.insert("notes", {
       notebookId,
