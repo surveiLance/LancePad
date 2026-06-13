@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install *)",
       "Bash(npx tailwindcss *)",
-      "Bash(./node_modules/.bin/tailwindcss init *)"
+      "Bash(./node_modules/.bin/tailwindcss init *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(cat ~/.claude/settings.json 2>/dev/null; echo \"---\"; cat /Users/lance/Work/study-app/.claude/settings.json 2>/dev/null; echo \"---\"; cat /Users/lance/Work/study-app/.claude/settings.local.json 2>/dev/null)",
+      "Read(//Users/lance/.claude/**)"
     ]
   }
 }

@@ -216,7 +216,6 @@ export default function NotebooksPage() {
                 style={{ animation: "bubble-in 0.3s ease-out" }}
               >
                 {bubble}
-                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 sm:left-auto sm:translate-x-0 sm:-left-1.5 sm:bottom-3 w-3 h-3 bg-gray-900 border-r border-b sm:border-r-0 sm:border-l sm:border-b border-purple-800/50 rotate-45 sm:rotate-45" />
               </div>
             )}
           </div>
