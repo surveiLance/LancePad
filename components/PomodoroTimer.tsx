@@ -125,7 +125,13 @@ function TimerPanel({ state, onClose }: { state: TimerState; onClose: () => void
 
 export default function PomodoroTimer({ variant = "floating" }: PomodoroTimerProps) {
   const pathname = usePathname();
-  const [state, setState] = useState<TimerState>({ modeIdx: 0, seconds: TIMER_MODES[0].minutes * 60, running: false });
+  const initialSeconds = TIMER_MODES[0].minutes * 60;
+  const [state, setState] = useState<TimerState>({
+    modeIdx: 0,
+    seconds: initialSeconds,
+    totalSeconds: initialSeconds,
+    running: false,
+  });
   const [open, setOpen] = useState(false);
 
   useEffect(() => subscribeTimer(setState), []);

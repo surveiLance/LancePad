@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev -p 3001\" \"npx convex dev\" --names \"next,convex\" --prefix-colors \"magenta,cyan\"",
+    "dev": "concurrently \"next dev -p 3002\" \"npx convex dev\" --names \"next,convex\" --prefix-colors \"magenta,cyan\"",
     "build": "next build",
     "start": "next start",
     "postinstall": "patch-package"

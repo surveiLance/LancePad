@@ -3,34 +3,22 @@ import Groq from "groq-sdk";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { buildTutorSystemPrompt } from "@/lib/lancebot";
+import { buildNoteSourceChunks, buildTutorSystemPrompt, extractNoteText } from "@/lib/lancebot";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-function extractText(tiptapJson: string): string {
-  try {
-    const doc = JSON.parse(tiptapJson);
-    function walk(node: { type?: string; text?: string; content?: unknown[] }): string {
-      if (node.type === "text") return node.text ?? "";
-      if (node.content) return (node.content as typeof node[]).map(walk).join(" ");
-      return "";
-    }
-    return walk(doc).replace(/\s+/g, " ").trim();
-  } catch {
-    return tiptapJson;
-  }
-}
-
 export async function POST(req: NextRequest) {
-  const { messages, notebookId, notebookTitle, username } = await req.json();
+  const { messages, notebookId, notebookTitle, username, noteContent } = await req.json();
 
   const note = await fetchQuery(
     api.notes.getByNotebook,
     { notebookId: notebookId as Id<"notebooks"> }
   );
 
-  const noteText = note?.content ? extractText(note.content) : "";
-  const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText, username);
+  const rawNoteContent = typeof noteContent === "string" ? noteContent : note?.content;
+  const noteText = rawNoteContent ? extractNoteText(rawNoteContent) : "";
+  const sourceChunks = rawNoteContent ? buildNoteSourceChunks(rawNoteContent) : [];
+  const systemPrompt = buildTutorSystemPrompt(notebookTitle, noteText, username, sourceChunks);
 
   const history = messages.slice(-6).map((m: { role: string; content: string }) => ({
     role: m.role as "user" | "assistant",

@@ -26,6 +26,7 @@ export default function TutorPage() {
   const notebookId = params.id as Id<"notebooks">;
 
   const notebook = useQuery(api.notebooks.get, { id: notebookId });
+  const note = useQuery(api.notes.getByNotebook, { notebookId });
   const username = useQuery(api.userProfiles.getMe) ?? null;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -65,7 +66,7 @@ export default function TutorPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, noteContent: note?.content, username }),
       });
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();
@@ -99,7 +100,7 @@ export default function TutorPage() {
           <LanceBot mood={botMood} size={32} animate={botMood === "thinking"} />
           <div className="flex-1">
             <span className="font-semibold text-white text-sm">LanceBot</span>
-            <span className="text-gray-500 text-xs ml-2">{loading ? "typing..." : `tutor for ${notebook?.emoji} ${notebook?.title}`}</span>
+            <span className="text-gray-500 text-xs ml-2">{loading ? "reading notes..." : `live tutor for ${notebook?.emoji} ${notebook?.title}`}</span>
           </div>
           <button onClick={clearChat} className="text-gray-500 hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-800 transition-colors" title="Clear chat">
             <RotateCcw size={15} />
@@ -176,10 +177,11 @@ function MarkdownText({ text }: { text: string }) {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[S\d+\])/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`")) return <code key={i} className="bg-gray-800 px-1 rounded text-purple-300 text-xs font-mono">{part.slice(1, -1)}</code>;
+    if (/^\[S\d+\]$/.test(part)) return <span key={i} className="mx-0.5 rounded bg-purple-950/70 px-1.5 py-0.5 text-[10px] font-semibold text-purple-200 ring-1 ring-purple-800/60">{part}</span>;
     return part;
   });
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { NOTEBOOK_COLORS, NOTEBOOK_EMOJIS } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import EmojiPicker from "@/components/EmojiPicker";
 import { X } from "lucide-react";
 
 interface EditNotebookModalProps {
@@ -50,22 +51,7 @@ export default function EditNotebookModal({ notebook, onClose, onSave }: EditNot
 
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2 block">Icon</label>
-            <div className="grid grid-cols-8 gap-2">
-              {NOTEBOOK_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(e)}
-                  className={`text-2xl p-2 rounded-xl transition-all ${
-                    emoji === e
-                      ? "bg-purple-600/30 border-2 border-purple-500"
-                      : "border-2 border-transparent hover:bg-gray-800"
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
+            <EmojiPicker emojis={NOTEBOOK_EMOJIS} value={emoji} onChange={setEmoji} />
           </div>
 
           <div>

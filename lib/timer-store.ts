@@ -80,5 +80,7 @@ export function setCustomDuration(totalSeconds: number) {
 export function subscribeTimer(listener: Listener) {
   _listeners.add(listener);
   listener({ ..._state });
-  return () => _listeners.delete(listener);
+  return () => {
+    _listeners.delete(listener);
+  };
 }

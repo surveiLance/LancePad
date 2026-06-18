@@ -50,8 +50,103 @@ Example style:
 
 Keep it short, keep it fun. Never monologue. One fact, one joke, then move on.`;
 
-export function buildTutorSystemPrompt(notebookTitle: string, noteContent: string, username?: string | null): string {
+type SourceChunk = {
+  id: string;
+  title: string;
+  text: string;
+};
+
+type TiptapNode = {
+  type?: string;
+  text?: string;
+  content?: TiptapNode[];
+  attrs?: {
+    level?: number;
+  };
+};
+
+function cleanText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function nodeText(node: TiptapNode): string {
+  if (node.type === "text") return node.text ?? "";
+  if (node.content) return cleanText(node.content.map(nodeText).join(" "));
+  return "";
+}
+
+export function extractNoteText(tiptapJson: string): string {
+  try {
+    const doc = JSON.parse(tiptapJson) as TiptapNode;
+    return nodeText(doc);
+  } catch {
+    return cleanText(tiptapJson);
+  }
+}
+
+export function buildNoteSourceChunks(tiptapJson: string, maxChunks = 10): SourceChunk[] {
+  try {
+    const doc = JSON.parse(tiptapJson) as TiptapNode;
+    const blocks = doc.content ?? [];
+    const chunks: Omit<SourceChunk, "id">[] = [];
+    let currentTitle = "Notebook notes";
+    let currentLines: string[] = [];
+
+    function flush() {
+      const text = cleanText(currentLines.join(" "));
+      if (text) chunks.push({ title: currentTitle, text: text.slice(0, 700) });
+      currentLines = [];
+    }
+
+    for (const block of blocks) {
+      const text = nodeText(block);
+      if (!text) continue;
+
+      if (block.type === "heading") {
+        flush();
+        currentTitle = text.slice(0, 80);
+        continue;
+      }
+
+      currentLines.push(text);
+      if (cleanText(currentLines.join(" ")).length > 550) flush();
+    }
+    flush();
+
+    return chunks.slice(0, maxChunks).map((chunk, index) => ({
+      id: `S${index + 1}`,
+      ...chunk,
+    }));
+  } catch {
+    const text = extractNoteText(tiptapJson);
+    if (!text) return [];
+    const chunks: SourceChunk[] = [];
+    for (let i = 0; i < text.length && chunks.length < maxChunks; i += 650) {
+      chunks.push({
+        id: `S${chunks.length + 1}`,
+        title: "Notebook notes",
+        text: text.slice(i, i + 650),
+      });
+    }
+    return chunks;
+  }
+}
+
+function formatSourceContext(chunks: SourceChunk[]): string {
+  if (chunks.length === 0) return "";
+  return chunks
+    .map((chunk) => `[${chunk.id}] ${chunk.title}\n${chunk.text}`)
+    .join("\n\n");
+}
+
+export function buildTutorSystemPrompt(
+  notebookTitle: string,
+  noteContent: string,
+  username?: string | null,
+  sourceChunks: SourceChunk[] = buildNoteSourceChunks(noteContent)
+): string {
   const userLine = username ? `\n\nThe student's name is ${username}. Address them by name occasionally — keep it personal and fun.` : "";
+  const sourceContext = formatSourceContext(sourceChunks);
   return `${LANCEBOT_SYSTEM_PROMPT}${userLine}
 
 ---
@@ -61,7 +156,11 @@ Here are the notes/content from this deck that you should use as your knowledge 
 
 ${noteContent || "No notes have been added yet — encourage the user to add some notes to the notebook so you can help them study!"}
 
-Stick to this content when answering questions. Default to playful but compact answers: 1-3 sentences for simple questions, short bullets for explanations. If the user asks for depth, expand, but keep the little LanceBot spark alive.`;
+${sourceContext ? `\nSource map from the current notebook:\n\n${sourceContext}` : ""}
+
+Stick to this content when answering questions. Default to playful but compact answers: 1-3 sentences for simple questions, short bullets for explanations. If the user asks for depth, expand, but keep the little LanceBot spark alive.
+
+When the answer uses notebook content, cite the source tags inline like [S1] or [S2]. If the answer depends on multiple parts of the notebook, cite each relevant tag. End substantive notebook-based answers with a compact "Sources:" line listing the cited tags and their section names. If the notes do not contain enough evidence, say that clearly instead of guessing.`;
 }
 
 export function buildHelpSystemPrompt(username?: string | null): string {

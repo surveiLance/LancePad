@@ -320,7 +320,7 @@ export default function NotebookPage() {
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, username }),
+        body: JSON.stringify({ messages: newMessages, notebookId, notebookTitle: notebook?.title, noteContent, username }),
       });
       if (!res.body) throw new Error("No stream");
       setGroqUsage({
@@ -585,7 +585,7 @@ export default function NotebookPage() {
             <div className="flex-1 min-w-0">
               <p className="text-white font-semibold text-sm">LanceBot</p>
               <p className="text-gray-500 text-xs truncate">
-                {chatLoading ? "typing..." : `tutor · ${notebook.emoji} ${notebook.title}`}
+                {chatLoading ? "reading live notes..." : `live tutor · ${notebook.emoji} ${notebook.title}`}
               </p>
             </div>
             <button
@@ -869,12 +869,14 @@ function MarkdownText({ text }: { text: string }) {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[S\d+\])/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**"))
       return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`"))
       return <code key={i} className="bg-gray-800 px-1 rounded text-purple-300 text-xs font-mono">{part.slice(1, -1)}</code>;
+    if (/^\[S\d+\]$/.test(part))
+      return <span key={i} className="mx-0.5 rounded bg-purple-950/70 px-1.5 py-0.5 text-[10px] font-semibold text-purple-200 ring-1 ring-purple-800/60">{part}</span>;
     return part;
   });
 }
