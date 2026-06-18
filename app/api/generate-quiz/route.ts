@@ -97,7 +97,7 @@ function normalizeMultipleChoiceQuestion(question: QuizQuestion, fallbackAnswers
     .filter((candidate) => !distractors.some((option) => choicesAreTooSimilar(option, candidate)));
 
   const options = dedupeChoices([answer, ...distractors, ...extraDistractors]).slice(0, 4);
-  if (options.length < 2 || !options.some((option) => choicesAreTooSimilar(option, answer))) return null;
+  if (options.length !== 4 || !options.some((option) => choicesAreTooSimilar(option, answer))) return null;
 
   return {
     ...question,
@@ -161,6 +161,68 @@ function sanitizeQuestions(questions: QuizQuestion[]): QuizQuestion[] {
   return rebalanceAnswerPositions(sanitized);
 }
 
+async function removeAmbiguousMultipleChoiceQuestions(
+  questions: QuizQuestion[],
+  notes: string,
+  notebookTitle: string
+): Promise<QuizQuestion[]> {
+  const multipleChoiceQuestions = questions.filter((question) => question.type === "multiple_choice");
+  if (!multipleChoiceQuestions.length) return questions;
+
+  const validationPayload = multipleChoiceQuestions.map((question, index) => ({
+    index,
+    question: question.question,
+    answer: question.answer,
+    options: question.options ?? [],
+  }));
+
+  const prompt = `You are validating multiple-choice quiz questions for "${notebookTitle}".
+
+Notes:
+${notes.slice(0, 6000)}
+
+Questions:
+${JSON.stringify(validationPayload, null, 2)}
+
+Return ONLY valid JSON:
+{
+  "validIndexes": [0, 1, 2]
+}
+
+A question is valid ONLY if exactly one option is correct based on the notes.
+Mark a question invalid if ANY distractor:
+- could reasonably answer the question
+- is part of the correct answer
+- is a synonym, paraphrase, example, subcategory, or overlapping trait of the correct answer
+- is true from the notes but not the intended answer
+- makes the question depend on vague wording like "one key characteristic" when multiple listed options are valid
+
+Do not explain. Return only the indexes of questions with one unambiguous correct option.`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0,
+      max_tokens: 400,
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { validIndexes?: number[] };
+    const validIndexes = new Set(parsed.validIndexes ?? []);
+
+    return questions.filter((question) => {
+      if (question.type !== "multiple_choice") return true;
+      const index = multipleChoiceQuestions.indexOf(question);
+      return validIndexes.has(index);
+    });
+  } catch (err) {
+    console.warn("[generate-quiz] MC validation skipped:", err);
+    return questions;
+  }
+}
+
 function buildPrompt(plainText: string, notebookTitle: string, mode: string, quizType?: string): string {
   if (mode === "cards") {
     return `You are a flashcard generator. Given these notes, generate one flashcard per key topic — cover everything, leave nothing out.
@@ -200,10 +262,12 @@ Rules:
 NOTES (from "${notebookTitle}"):
 ${plainText}
 
-Generate exactly 10 multiple choice questions as JSON. Each question has 4 options, one correct answer.
+Generate 14 candidate multiple choice questions as JSON. Each question has 4 options, one correct answer.
 All 4 options must be plausible and related to the topic — no obviously wrong distractors.
 The correct answer must come directly from the notes.
-Each distractor must be clearly different from the correct answer and from the other distractors. Do not use reworded versions, synonyms, overlapping phrases, or choices where more than one could reasonably be correct.
+Each distractor must be clearly different from the correct answer and from the other distractors. Do not use reworded versions, synonyms, overlapping phrases, examples, subcategories, or choices where more than one could reasonably be correct.
+Do NOT ask broad questions like "What is one key characteristic..." if the notes list several valid characteristics. Ask for a specific relationship, definition, cause, result, comparison, or uniquely identifying detail instead.
+Before returning, self-check each question: if any distractor is also true, partly true, part of the answer, or defensible from the notes, replace that distractor or replace the whole question.
 Randomize the correct answer position independently for each question. Do not put the correct answer in the same letter position repeatedly.
 
 Return ONLY valid JSON array, no markdown, no code blocks:
@@ -339,6 +403,10 @@ export async function POST(req: NextRequest) {
   }
 
   questions = sanitizeQuestions(questions);
+  if (mode === "quiz" && (quizType ?? "multiple_choice") === "multiple_choice") {
+    questions = await removeAmbiguousMultipleChoiceQuestions(questions, truncated, notebookTitle);
+    questions = rebalanceAnswerPositions(questions).slice(0, 10);
+  }
   if (!questions.length) {
     return NextResponse.json({ error: "no_valid_questions" }, { status: 500 });
   }
